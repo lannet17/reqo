@@ -210,12 +210,12 @@ pub enum Stream {
     NonConnection,
     // Synchronous
     SyncHttp(ProxyStream<std::net::TcpStream>),
-    SyncHttps(TlsStream),
+    SyncHttps(TlsStream<Box<dyn crate::tls::TlsIo>>),
     // Asynchronous
     #[cfg(feature = "aync")]
     AsyncHttp(ProxyStream<tokio::net::TcpStream>),
     #[cfg(feature = "aync")]
-    AsyncHttps(AsyncTlsStream),
+    AsyncHttps(TlsStream<Box<dyn crate::tls::AsyncTlsIo>>),
 }
 
 impl Stream {

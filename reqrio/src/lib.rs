@@ -52,8 +52,6 @@ pub use reqo_base::*;
 pub use log::*;
 pub use scq::Session;
 pub use stream::{Proxy, ProxyStream, ConnParam, WebSocket, TlsStream, Stream, StreamMessage};
-#[cfg(feature = "aync")]
-pub use stream::AsyncTlsStream;
 pub use tls::{ClientIdentity, TlsConnector, TlsVersion};
 
 // `aync` enables tokio-rustls even without `rustls` (Cargo has no "both

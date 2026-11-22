@@ -9,8 +9,6 @@ use crate::stream::http3::HTTP3Stream;
 use crate::stream::quic::QUICConnect;
 use crate::stream::write::BufWriting;
 use crate::stream::{ConnParam, HTTPStream, ProxyStream, Stream, TlsStream};
-#[cfg(feature = "aync")]
-use crate::stream::AsyncTlsStream;
 use crate::tls::{TlsConnector, TlsOptions};
 use crate::*;
 #[cfg(feature = "aync")]
@@ -154,7 +152,7 @@ impl HTTPStream {
                 let handshake = connector.connect_async(Box::new(proxy_stream), tls);
                 let io = tokio::time::timeout(param.timeout.connect(), handshake).await
                     .or(Err(TimeError::ConnectTimeout))??;
-                let tls_stream = AsyncTlsStream::new(io, param.timeout.clone());
+                let tls_stream = TlsStream::new_async(io, param.timeout.clone());
                 if *tls_stream.alpn() != ALPN::HTTP20 {
                     return Ok((ALPN::HTTP11, HTTPStream::AsyncH1(HTTP1Stream::new(Stream::AsyncHttps(tls_stream)))));
                 }
