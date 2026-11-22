@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use std::cmp::min;
-use reqtls::coder::*;
+use reqo_base::coder::*;
 use crate::*;
 use crate::error::HlsResult;
 use crate::pack::PackItem;
@@ -101,11 +101,14 @@ impl StreamMessage {
                 Ok((self.remain == 0, read_len))
             }
             Some(ref mut coder) => {
-                let mut reader = Reader::from_slice(buf);
+                // `buf` may already contain the next pipelined response: never
+                // feed the decoder more than what is left of this body.
+                let limit = min(buf.len(), self.remain);
+                let mut reader = Reader::from_slice(&buf[..limit]);
                 let finish = coder.decompress(&mut reader, &mut self.body)?;
-                debug_assert_eq!(buf.len(), reader.position(), "{} {}", finish, self.header);
-                self.remain -= reader.position();
-                Ok((finish || self.remain == 0, reader.position()))
+                let used = reader.position();
+                self.remain -= used;
+                Ok((finish || self.remain == 0, used))
             }
         }
     }

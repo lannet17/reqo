@@ -1,5 +1,5 @@
 mod finger;
-use reqrio::*;
+use reqo::*;
 
 
 #[test]

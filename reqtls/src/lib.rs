@@ -289,6 +289,10 @@ mod ext;
 #[cfg(feature = "quic")]
 pub mod quic;
 mod gm_sm;
+#[cfg(feature = "reqo")]
+mod reqo_backend;
+#[cfg(feature = "reqo")]
+pub use reqo_backend::ReqtlsConnector;
 
 pub use alpn::ALPN;
 pub use boring::{

@@ -5,17 +5,16 @@
 //!
 //! ## Why reqrio?
 //!
-//! - **Undetectable Client Simulation**: Authentic TLS fingerprinting and browser-identical request headers for bypassing bot detection
+//! - **Browser-like Requests**: Browser-identical header ordering and HTTP/2 settings; TLS fingerprinting via a pluggable backend
 //! - **Enterprise-Grade Performance**: Handle thousands of concurrent requests with minimal overhead using async/sync dual-mode
-//! - **Production-Ready TLS**: BoringSSL-based implementation with certificate management, mTLS support, and session resumption
+//! - **Pluggable TLS**: rustls by default (mTLS, session resumption); swap in any [`tls::TlsConnector`]
 //! - **Efficient Memory Usage**: Intelligent use of Rust's lifetime system and `Cow` to eliminate unnecessary copies
 //!
 //! ## Core Features
 //!
 //! - **Efficient Reference-Based Architecture**: Leverages Rust's ownership model with `Cow` and lifetime borrowing to minimize allocations
 //! - **Dual Concurrency Models**: Sync (`ScReq`) and Async (`AcReq`) engines for flexible deployment
-//! - **Browser-Compatible TLS**: Implemented with BoringSSL for feature parity with Chrome, Firefox, and Edge
-//! - **Advanced TLS Fingerprinting** (subscription): Customize via hexadecimal, Ja3, or Ja4 standards for maximum authenticity
+//! - **TLS Fingerprinting**: available through the optional reqtls backend (hex / Ja3 / Ja4)
 //! - **Strict Header Ordering**: Enforces HTTP/2.0 and HTTP/1.1 header sequences consistent with real browser requests
 //! - **Complete Protocol Support**: HTTP/1.1, HTTP/2.0, and full-duplex WebSocket with connection pooling
 //!
@@ -54,9 +53,9 @@
 //! The simplest way to send a GET request:
 //!
 //! ```rust
-//! # use reqrio::*;
+//! # use reqo::*;
 //! # fn example() -> Result<(), Box<dyn std::error::Error>> {
-//! let mut res = reqrio::get("https://api.example.com/users", None)?;
+//! let mut res = reqo::get("https://api.example.com/users", None)?;
 //! println!("{}", res.as_text()?);
 //! # Ok(())
 //! # }
@@ -65,7 +64,7 @@
 //! ### GET Request with Query Parameters
 //! Add query parameters using the `.params()` method:
 //! ```rust
-//! # use reqrio::*;
+//! # use reqo::*;
 //! # fn ff() {
 //! let params = json::object! {
 //!     "p1": 1,
@@ -73,7 +72,7 @@
 //! };
 //!
 //! // Send GET request with query parameters
-//! let mut res = reqrio::get("https://www.baidu.com".params(params), None).unwrap();
+//! let mut res = reqo::get("https://www.baidu.com".params(params), None).unwrap();
 //!
 //! // Access response headers
 //! let header = res.header();
@@ -85,7 +84,7 @@
 //!
 //! ### POST with Form Data
 //! ```rust
-//! # use reqrio::*;
+//! # use reqo::*;
 //! # fn ff() {
 //! let url = "https://www.baidu.com/api";
 //! let data = json::object! {
@@ -93,13 +92,13 @@
 //!     "field2": "value2"
 //! };
 //!
-//! let resp = reqrio::post(url, data.form()).unwrap();
+//! let resp = reqo::post(url, data.form()).unwrap();
 //! # }
 //! ```
 //!
 //! ### POST with JSON Data
 //! ```rust
-//! # use reqrio::*;
+//! # use reqo::*;
 //! # fn ff() {
 //! let url = "https://www.baidu.com/api";
 //! let data = json::object! {
@@ -107,13 +106,14 @@
 //!     "field2": "value2"
 //! };
 //!
-//! let resp = reqrio::post(url, data).unwrap();
+//! let resp = reqo::post(url, data).unwrap();
 //! # }
 //! ```
 //!
 //! ### POST with Serializable Struct
-//! ```rust
-//! # use reqrio::*;
+//! ```rust,ignore
+//! // requires the `serde` feature
+//! # use reqo::*;
 //! # use serde::Serialize;
 //! # fn ff() {
 //! #[derive(Serialize)]
@@ -123,7 +123,7 @@
 //! }
 //!
 //! let url = "https://www.baidu.com/api";
-//! let resp = reqrio::post(
+//! let resp = reqo::post(
 //!     url,
 //!     Body::json(&Data {
 //!         field1: "value".to_string(),
@@ -137,7 +137,7 @@
 //! For authentic browser emulation, configure a session with custom headers and TLS settings:
 //!
 //! ```rust
-//! # use reqrio::*;
+//! # use reqo::*;
 //! # fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! let headers = json::object! {
 //!     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
@@ -163,7 +163,7 @@
 //! ### WebSocket Connection (Sync)
 //! Real-time communication with WebSocket protocol:
 //! ```rust
-//! # use reqrio::*;
+//! # use reqo::*;
 //! # fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! let url = "wss://stream.example.com/events";
 //!
@@ -230,33 +230,40 @@
 //! For advanced TLS scenarios like mTLS or custom certificate chains:
 //!
 //! ```rust,no_run
-//! # use reqrio::*;
-//! let mut req = ScReq::new();
-//!
-//! // Load client certificate and key
-//! let certs = Certificate::from_pem_file("client.pem")?;
-//! let key = RsaKey::from_pri_pem_file("client.key")?;
-//!
-//! // Add custom CA certificates
-//! let ca_certs = Certificate::from_pem_file("ca-bundle.pem")?;
-//!
-//! // Set them in the request engine
-//! // req.with_certs(certs).with_key(key).with_ca_certs(ca_certs);
+//! # use reqo::*;
+//! // Client certificate chain + key (PEM), and an optional private CA bundle (PEM).
+//! let identity = ClientIdentity::from_pem_files("client.pem", "client.key")?;
+//! let ca = std::fs::read("ca-bundle.pem")?;
+//! let req = ScReq::new().with_mtls(identity, Some(ca));
 //! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! ### TLS backends
+//! TLS is pluggable through [`tls::TlsConnector`]. The default `rustls` feature
+//! uses rustls; to use another backend (e.g. reqtls for ClientHello
+//! fingerprinting), disable default features and install its connector:
+//!
+//! ```toml
+//! # take both from the same git source, so there is only one `reqo` (and one `TlsConnector` trait)
+//! reqo = { git = "https://github.com/lannet17/reqo", default-features = false }
+//! reqtls = { git = "https://github.com/lannet17/reqo", features = ["reqo"] }
+//! ```
+//! ```rust,ignore
+//! let req = ScReq::new().with_tls_connector(std::sync::Arc::new(reqtls::ReqtlsConnector::default()));
 //! ```
 //!
 //! ### Proxy Configuration
 //! Route requests through HTTP/SOCKS proxies:
 //!
 //! ```rust,no_run
-//! # use reqrio::*;
+//! # use reqo::*;
 //! // let proxy = Proxy::http("http://proxy.example.com:8080")?;
 //! // let mut req = ScReq::new().with_proxy(proxy);
 //! ```
 //!
 //! ## Ecosystem Integration
 //!
-//! - **reqtls**: Underlying TLS and cryptographic engine
+//! - **reqo-base**: Buffers, URL types and content coding shared with TLS backends
 //! - **reqrio-json**: Built-in JSON utilities
 //! - **pack**: HTTP/2 header compression support
 //!
@@ -274,6 +281,7 @@ mod body;
 mod fingerprint;
 mod reader;
 mod cookie;
+pub mod tls;
 mod time;
 #[cfg(feature = "log")]
 mod logger;
@@ -282,11 +290,10 @@ pub type ReqCallback = Box<dyn FnMut(&[u8]) -> HlsResult<()> + Send + Sync>;
 pub const HTTP_GAP: &[u8; 4] = b"\r\n\r\n";
 pub const CHUNK_END: [u8; 7] = [13, 10, 48, 13, 10, 13, 10];
 
-use crate::error::HlsResult;
 #[cfg(feature = "aync")]
 pub use acq::AcReq;
 pub use body::{Body, FileForm, HttpFile, BodyData, BodyExt};
-pub use error::HlsError;
+pub use error::{HlsError, HlsResult};
 pub use ext::{ReqExt, ReqStreamExt, UrlExt};
 pub use fingerprint::{Fingerprint, H2Finger};
 pub use packet::{
@@ -297,13 +304,26 @@ pub use packet::{
 #[cfg(feature = "quic")]
 pub use packet::{H3Payload, H3FrameType, H3Setting, H3Frame};
 pub use reqrio_json as json;
-pub use reqtls::*;
+pub use reqo_base::*;
+#[cfg(feature = "log")]
+pub use log::*;
 pub use scq::ScReq;
 pub use stream::{Proxy, ProxyStream, ConnParam, WebSocket, TlsStream, Stream, StreamMessage};
+#[cfg(feature = "aync")]
+pub use stream::AsyncTlsStream;
+pub use tls::{ClientIdentity, TlsConnector, TlsVersion};
+
+// `aync` always pulls in tokio-rustls (Cargo can't express "aync AND rustls");
+// it is only used together with the `rustls` feature.
+#[cfg(all(feature = "aync", not(feature = "rustls")))]
+use tokio_rustls as _;
+
+#[cfg(feature = "quic")]
+compile_error!("the `quic` feature is not supported yet with the pluggable TLS layer");
 #[cfg(feature = "quic")]
 pub use stream::QUICStream;
 pub use time::{Time, TimeError, Timeout};
-#[cfg(feature = "tokio")]
+#[cfg(feature = "aync")]
 pub use tokio;
 #[cfg(feature = "log")]
 pub use logger::Logger;

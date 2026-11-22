@@ -1,7 +1,7 @@
 use crate::error::HlsResult;
 use crate::{Header, Method, json};
 use reqrio_json::JsonValue;
-use reqtls::{ALPN, Buffer, Uri};
+use reqo_base::{ALPN, Buffer, Uri};
 use std::fmt::{Display, Formatter};
 use std::str::Utf8Error;
 

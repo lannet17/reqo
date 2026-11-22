@@ -5,7 +5,7 @@ use crate::reader::ReadExt;
 use crate::stream::read::ChunkReading;
 use crate::stream::{Stream, StreamMessage};
 use crate::*;
-use reqtls::{Buffer, Reader, Writer, u24};
+use reqo_base::{Buffer, Reader, Writer, u24};
 use std::collections::HashMap;
 use packet::H2PayloadValue;
 use super::message::SendParam;
@@ -17,6 +17,8 @@ pub struct HTTP2Stream {
     stream: Stream,
     read_buffer: Writer,
     write_buffer: Writer,
+    /// Scratch space for one DATA frame payload.
+    body_buffer: Writer,
     increment: u32,
     #[cfg(feature = "aync")]
     timeout: Timeout,
@@ -33,6 +35,7 @@ impl HTTP2Stream {
             stream,
             read_buffer: buffer,
             write_buffer: Writer::with_capacity(16438),
+            body_buffer: Writer::with_capacity(8192),
             increment: 0,
         }
     }
@@ -110,12 +113,12 @@ impl HTTP2Stream {
         let start = self.write_buffer.end();
         let frame = self.build_frame(H2FrameType::Data, param);
         frame.write_to(&mut self.write_buffer)?;
-        let mut writer = Writer::from_ptr(self.write_buffer.unfilled_ptr(), 8192);
-        reader.read(&mut writer)?;
-        match writer.is_empty() {
+        self.body_buffer.reset();
+        reader.read(&mut self.body_buffer)?;
+        match self.body_buffer.is_empty() {
             true => self.write_buffer.reset_offset(self.write_buffer.start()..start),
             false => {
-                self.write_buffer.add_len(writer.len());
+                self.write_buffer.extend_from_slice(self.body_buffer.filled())?;
                 let len = self.write_buffer.end() - start - 9;
                 self.write_buffer.write_u24_in(start, len as u24)?;
                 if reader.wrote() {
@@ -299,6 +302,7 @@ mod tests {
             stream: Stream::NonConnection,
             read_buffer: Buffer::none(),
             write_buffer: Buffer::with_capacity(3072),
+            body_buffer: Buffer::with_capacity(8192),
             increment: 0,
         };
         stream.encode_hdr(0, &SendParam {

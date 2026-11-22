@@ -18,3 +18,6 @@ builtin.dat
 cad2d041.dat
 cd943d9b.dat
 reqrio/tests/vip_finger.rs
+# reqtls is built standalone (excluded from the workspace)
+reqtls/target/
+reqtls/Cargo.lock

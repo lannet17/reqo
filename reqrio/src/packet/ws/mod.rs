@@ -1,6 +1,6 @@
 pub use payload::WsPayload;
-use reqtls::coder::TZCoder;
-use reqtls::Reader;
+use reqo_base::coder::TZCoder;
+use reqo_base::Reader;
 pub use typ::{WsFrameType, WsOpcode};
 
 

@@ -1,8 +1,8 @@
 mod sync_http;
 
 use std::time::Instant;
-use reqrio::{json, HttpStatus, ReqExt, ScReq, Timeout, Method};
-use reqtls::ALPN;
+use reqo::{json, HttpStatus, ReqExt, ScReq, Timeout, Method};
+use reqo::ALPN;
 
 
 #[test]
@@ -107,17 +107,17 @@ fn test_concurrency() {
 
 #[test]
 fn http_one_shot_api() {
-    let res = reqrio::get("https://httpbin.reqrio.com/get", None).unwrap();
+    let res = reqo::get("https://httpbin.reqrio.com/get", None).unwrap();
     assert_eq!(res.status(), HttpStatus::OK);
     let res = res.json().unwrap();
     assert_eq!(res["method"].to_string(), "GET");
 
-    let res = reqrio::post("https://httpbin.reqrio.com/post", json::object! { "x": 1 }).unwrap();
+    let res = reqo::post("https://httpbin.reqrio.com/post", json::object! { "x": 1 }).unwrap();
     assert_eq!(res.status(), HttpStatus::OK);
     let res = res.json().unwrap();
     assert_eq!(res["json"]["x"].to_string(), "1");
 
-    let res = reqrio::put("https://httpbin.reqrio.com/put", "raw").unwrap();
+    let res = reqo::put("https://httpbin.reqrio.com/put", "raw").unwrap();
     assert_eq!(res.status(), HttpStatus::OK);
     let res = res.json().unwrap();
     assert_eq!(res["data"].to_string(), "raw");

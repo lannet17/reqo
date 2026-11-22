@@ -1,6 +1,6 @@
 use crate::error::HlsResult;
 use crate::reader::{ReadExt, RefReader};
-use reqtls::Writer;
+use reqo_base::Writer;
 use std::fs::File;
 use std::io::{Cursor, Read};
 
@@ -147,7 +147,7 @@ impl<'a> ReadExt for FileFormReader<'a> {
 mod tests {
     use crate::reader::ReadExt;
     use crate::{json, HttpFile};
-    use reqtls::Writer;
+    use reqo_base::Writer;
     use std::sync::Arc;
 
     #[test]
@@ -155,8 +155,7 @@ mod tests {
         let file = HttpFile::new_bytes_data(json::object! {"test filed":"value"}, b"test file data")
             .with_boundary(Arc::new("----WebKitFormBoundary1234567812345678".to_string()));
         let mut reader = file.as_reader().unwrap();
-        let mut res = [0; 1024];
-        let mut writer = Writer::from_ptr(res.as_mut_ptr(), res.len());
+        let mut writer = Writer::with_capacity(1024);
         let len = reader.read(&mut writer).unwrap();
         let raw = vec![
             "------WebKitFormBoundary1234567812345678",
@@ -169,6 +168,6 @@ mod tests {
             "test file data",
             "------WebKitFormBoundary1234567812345678--"
         ];
-        assert_eq!(&res[..len], raw.join("\r\n").as_bytes());
+        assert_eq!(&writer.filled()[..len], raw.join("\r\n").as_bytes());
     }
 }

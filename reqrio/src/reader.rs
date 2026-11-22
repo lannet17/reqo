@@ -1,5 +1,5 @@
 use crate::error::HlsResult;
-use reqtls::Writer;
+use reqo_base::Writer;
 use std::fmt::{Debug, Formatter};
 use std::io::{Cursor, Read};
 use std::ops::Deref;

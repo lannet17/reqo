@@ -1,4 +1,4 @@
-use reqrio::{json, HlsError, Method, ReqExt, ScReq, Timeout, ALPN, Cipher};
+use reqo::{json, HlsError, Method, ReqExt, ScReq, Timeout, ALPN, Cipher};
 use std::fs::File;
 use std::io::Write;
 

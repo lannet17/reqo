@@ -1,5 +1,4 @@
-use reqrio::*;
-use std::fs;
+use reqo::*;
 
 #[cfg(feature = "log")]
 const LOGER: Logger = Logger {
@@ -22,7 +21,6 @@ fn test_log() {
 async fn main() {
     #[cfg(feature = "log")]
     test_log();
-    Fingerprint::check_subscription(fs::read_to_string("TOKEN").unwrap());
     let mut timeout = Timeout::longer();
     timeout.set_handle_times(1);
 
@@ -52,7 +50,7 @@ async fn main() {
         .with_key_log("2.log")
         .with_auto_redirect(false)
         // .with_proxy(Proxy::Null)
-        .with_alpn(ALPN::HTTP30)
+        .with_alpn(ALPN::HTTP20)
         .with_header_json(headers)
         // .with_mtls(vec![], RsaKey::none(), Some(vec![cert]))
         // .with_proxy(Proxy::try_from("http://180.117.50.133:3828").unwrap())

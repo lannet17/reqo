@@ -13,6 +13,8 @@ hex = "0.4"
 bytemuck = "1.25"
 urlencoding = "2.1"
 log = { version = "0.4", default-features = false, optional = true }
+# TLS backend for reqo (reqo is published; reqtls is not, so the dependency points this way).
+reqo = { path = "../reqrio", version = "0.5", default-features = false, optional = true }
 
 
 [features]
@@ -20,3 +22,7 @@ zstd = []
 static_link = []
 quic = []
 cert_signer = []
+# Implement `reqo::tls::TlsConnector` (sync).
+reqo = ["dep:reqo"]
+# ... and the async half (`reqo/aync`).
+reqo-async = ["reqo", "reqo/aync"]

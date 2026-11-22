@@ -1,0 +1,21 @@
+[package]
+name = "reqo-base"
+version = "0.5.0"
+edition = "2024"
+description = "Pure-Rust building blocks (buffers, URL, content coding) shared by reqo and its TLS backends."
+license-file = "../LICENSE-APACHE"
+repository = "https://github.com/lannet17/reqo"
+
+[dependencies]
+hex = "0.4"
+urlencoding = "2.1"
+rand = "0.9"
+md-5 = "0.10"
+base64 = "0.22"
+flate2 = "1"
+brotli = "8"
+zstd = { version = "0.13", optional = true }
+
+[features]
+default = ["zstd"]
+zstd = ["dep:zstd"]

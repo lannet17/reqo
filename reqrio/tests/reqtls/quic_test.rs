@@ -1,7 +1,7 @@
 #![cfg(all(feature = "quic", not(feature = "staticlink")))]
 use std::{env, fs};
 use std::sync::LazyLock;
-use reqrio::*;
+use reqo::*;
 
 static TOKEN: LazyLock<String> = LazyLock::new(|| fs::read_to_string("../TOKEN").unwrap_or(env::var("REQRIO_TOKEN").unwrap_or("".to_string())));
 

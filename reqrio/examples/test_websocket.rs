@@ -1,7 +1,7 @@
 use std::thread::sleep;
 use std::time::Duration;
-use reqrio::WebSocket;
-use reqtls::base64;
+use reqo::WebSocket;
+use reqo::base64;
 
 fn premessage_deflate() {
     let mut ws = WebSocket::open_sync("ws://127.0.0.1:9222/devtools/browser/3fc94ad8-3011-4968-85e9-db00f2243778").unwrap();

@@ -1,7 +1,7 @@
 use super::index::Index;
 use super::table::Table;
 use crate::pack::{huffman, PackItem};
-use reqtls::{BufferError, Writer};
+use reqo_base::{BufferError, Writer};
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 

@@ -1,4 +1,4 @@
-use reqrio::*;
+use reqo::*;
 use std::time::Instant;
 
 #[test]

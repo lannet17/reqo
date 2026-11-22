@@ -1,35 +1,28 @@
 [package]
-name = "reqrio"
-version = "0.4.2"
+name = "reqo"
+version = "0.5.0"
 edition = "2024"
 readme = "README.md"
-description = "A lightweight, high-performance, fingerprint-based HTTP request library."
+description = "A lightweight, high-performance HTTP request library with pluggable TLS backends (rustls by default)."
 license-file = "../LICENSE-APACHE"
-repository = "https://github.com/xllgl2017/reqrio/tree/main/reqrio"
-
-[[test]]
-name = "server_test"
-path = "tests/server_test.rs"
-required-features = ["reqtls/cert_signer"]
-
-[[test]]
-name = "quic_test"
-path = "tests/quic_test.rs"
-required-features = ["quic"]
+repository = "https://github.com/lannet17/reqo"
 
 [dependencies]
 reqrio-json = { workspace = true }
+reqo-base = { workspace = true }
 serde = { workspace = true, optional = true }
-tokio = { version = "1", features = ["time", "net", "io-util", "macros", 'rt-multi-thread'], optional = true }
-reqtls = { workspace = true, features = ["zstd"] }
+log = { version = "0.4", default-features = false, optional = true }
+tokio = { version = "1", features = ["time", "net", "io-util", "macros", "rt-multi-thread"], optional = true }
+# Default TLS backend. Disable default features to plug in your own `TlsConnector`.
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"], optional = true }
+webpki-roots = { version = "1", optional = true }
+tokio-rustls = { version = "0.26", default-features = false, optional = true }
 
 [features]
-aync = ["tokio"]
-staticlink = ["reqtls/static_link"]
-log = ["reqtls/log"]
-quic = ["reqtls/quic"]
-
-#[dev-dependencies]
-#reqwest = { version = "0.11", features = ["blocking"] }
-
-
+default = ["rustls"]
+rustls = ["dep:rustls", "dep:webpki-roots"]
+aync = ["dep:tokio", "dep:tokio-rustls"]
+log = ["dep:log"]
+zstd = ["reqo-base/zstd"]
+# HTTP/3 is not available with the pluggable TLS layer yet.
+quic = []

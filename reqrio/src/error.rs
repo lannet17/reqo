@@ -1,6 +1,6 @@
 use crate::json::JsonError;
 use crate::pack::PackError;
-use reqtls::{hex, Alert, BufferError, RlsError, UrlError, ALPN, HandShakeError};
+use reqo_base::{hex, BaseError, BufferError, UrlError, ALPN};
 use std::array::TryFromSliceError;
 use std::convert::Infallible;
 use std::error::Error;
@@ -14,9 +14,6 @@ use std::string::FromUtf8Error;
 use std::sync::PoisonError;
 #[cfg(feature = "aync")]
 use tokio::time::error::Elapsed;
-use reqtls::cipher::CipherError;
-#[cfg(feature = "quic")]
-use reqtls::quic::QUICError;
 use crate::body::FormError;
 use crate::H2FrameType;
 use crate::packet::HeaderError;
@@ -34,13 +31,13 @@ pub enum HlsError {
     H2(H2FrameType),
     UnsupportedAlpn(ALPN),
     Body(FormError),
-    Rls(RlsError),
+    Base(BaseError),
+    /// Error reported by the TLS backend.
+    Tls(String),
     HPack(PackError),
     Time(TimeError),
     Header(HeaderError),
     Currently(String),
-    #[cfg(feature = "quic")]
-    QUIC(QUICError),
 }
 
 impl From<&str> for HlsError {
@@ -78,15 +75,14 @@ impl Display for HlsError {
             HlsError::NullPointer => f.write_str("NonePointer"),
             HlsError::EncrypterNone => f.write_str("EncrypterNone"),
             HlsError::WsFrameTypeNone => f.write_str("WsFrameTypeNone"),
-            HlsError::Rls(e) => write!(f, "RlsError({})", e),
+            HlsError::Base(e) => write!(f, "{}", e),
+            HlsError::Tls(e) => write!(f, "Tls({})", e),
             HlsError::HPack(e) => write!(f, "HPack({})", e),
             HlsError::Body(e) => write!(f, "Body({})", e),
             HlsError::Time(e) => write!(f, "Time({:?})", e),
             HlsError::UnsupportedAlpn(alpn) => write!(f, "UnsupportedAlpn({})", alpn),
             HlsError::H2(typ) => write!(f, "H2({:?})", typ),
             HlsError::Header(e) => write!(f, "Header({:?})", e),
-            #[cfg(feature = "quic")]
-            HlsError::QUIC(e) => write!(f, "QUIC({:?})", e),
         }
     }
 }
@@ -134,9 +130,9 @@ impl From<Utf8Error> for HlsError {
     }
 }
 
-impl From<RlsError> for HlsError {
-    fn from(value: RlsError) -> Self {
-        HlsError::Rls(value)
+impl From<BaseError> for HlsError {
+    fn from(value: BaseError) -> Self {
+        HlsError::Base(value)
     }
 }
 
@@ -171,15 +167,9 @@ impl From<NulError> for HlsError {
     }
 }
 
-impl From<Alert> for HlsError {
-    fn from(value: Alert) -> Self {
-        HlsError::Rls(RlsError::Alert(value))
-    }
-}
-
 impl From<BufferError> for HlsError {
     fn from(value: BufferError) -> Self {
-        HlsError::Rls(RlsError::Buffer(value))
+        HlsError::Base(BaseError::Buffer(value))
     }
 }
 
@@ -196,7 +186,7 @@ impl From<TimeError> for HlsError {
 }
 impl From<UrlError> for HlsError {
     fn from(value: UrlError) -> Self {
-        HlsError::Rls(RlsError::Url(value))
+        HlsError::Base(BaseError::Url(value))
     }
 }
 
@@ -206,37 +196,15 @@ impl From<UrlError> for HlsError {
 //     }
 // }
 
-impl From<CipherError> for HlsError {
-    fn from(value: CipherError) -> Self {
-        HlsError::Rls(RlsError::Cipher(value))
-    }
-}
-
 impl From<HeaderError> for HlsError {
     fn from(value: HeaderError) -> Self {
         HlsError::Header(value)
     }
 }
 
-#[cfg(feature = "quic")]
-impl From<QUICError> for HlsError {
-    fn from(value: QUICError) -> Self {
-        match value {
-            QUICError::Rls(rls) => HlsError::Rls(rls),
-            _ => HlsError::QUIC(value),
-        }
-    }
-}
-
 impl From<H2FrameType> for HlsError {
     fn from(value: H2FrameType) -> Self {
         HlsError::H2(value)
-    }
-}
-
-impl From<HandShakeError> for HlsError {
-    fn from(value: HandShakeError) -> Self {
-        HlsError::Rls(RlsError::HandShake(value))
     }
 }
 

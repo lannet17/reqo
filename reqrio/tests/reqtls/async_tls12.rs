@@ -1,7 +1,7 @@
 mod finger;
 
 use crate::finger::{DEFAULT_SIGNATURE, build_finger};
-use reqrio::{AcReq, Fingerprint, ReqExt, ReqStreamExt, Timeout};
+use reqo::{AcReq, Fingerprint, ReqExt, ReqStreamExt, Timeout};
 use reqtls::{ALPN, CipherSuite, NamedCurve, Version};
 
 fn build_sample_finger(suite: CipherSuite, curve: NamedCurve) -> Fingerprint {

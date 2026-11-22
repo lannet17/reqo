@@ -1,7 +1,7 @@
 #[cfg(feature = "serde")]
-use reqrio::Body;
-use reqrio::{Application, BodyData, ContentType, FileForm, HttpFile, HttpStatus, ImageType, Method, ReqExt, ScReq, Text, UrlExt, json};
-use reqtls::{ALPN, base64, coder, rand};
+use reqo::Body;
+use reqo::{Application, BodyData, ContentType, FileForm, HttpFile, HttpStatus, ImageType, Method, ReqExt, ScReq, Text, UrlExt, json};
+use reqo::{ALPN, base64, coder, rand};
 
 ///Testing different types of requests
 pub fn http_get_matrix(req: &mut ScReq, alpn: ALPN) {

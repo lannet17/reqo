@@ -107,7 +107,16 @@ impl HTTP1Stream {
         } else { Ok(vec![]) }
     }
 
+    /// With pipelining, the previous read may already hold (part of) the next
+    /// response: parse what is buffered before blocking on the socket again.
+    fn recv_buffered(&mut self, responses: &mut HashMap<u64, StreamMessage>) -> HlsResult<Vec<u64>> {
+        if self.read_buffer.is_empty() || !responses.contains_key(&self.recv_sid) { return Ok(vec![]); }
+        self.recv(responses)
+    }
+
     pub fn recv_sync(&mut self, responses: &mut HashMap<u64, StreamMessage>) -> HlsResult<Vec<u64>> {
+        let done = self.recv_buffered(responses)?;
+        if !done.is_empty() { return Ok(done); }
         self.read_buffer.check_move(16384)?;
         self.stream.read(&mut self.read_buffer).wait()?;
         self.recv(responses)
@@ -115,6 +124,8 @@ impl HTTP1Stream {
 
     #[cfg(feature = "aync")]
     pub async fn recv_async(&mut self, responses: &mut HashMap<u64, StreamMessage>) -> HlsResult<Vec<u64>> {
+        let done = self.recv_buffered(responses)?;
+        if !done.is_empty() { return Ok(done); }
         self.read_buffer.check_move(16384)?;
         self.stream.read(&mut self.read_buffer).await?;
         self.recv(responses)
@@ -140,7 +151,7 @@ mod tests {
     use crate::stream::http1::SendParam;
     use crate::{Header, Method, json};
     use reqrio_json::JsonValue;
-    use reqtls::Url;
+    use reqo_base::Url;
 
     #[test]
     fn test_h1_hdr_encode() {

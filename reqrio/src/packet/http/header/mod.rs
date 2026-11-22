@@ -497,7 +497,7 @@ impl Display for Header {
 #[cfg(test)]
 mod tests {
     use crate::{Header, json};
-    use reqtls::ALPN;
+    use reqo_base::ALPN;
 
 
     #[test]

@@ -1,4 +1,4 @@
-use reqtls::coder::{StreamDecode, TZCoder};
+use reqo_base::coder::{StreamDecode, TZCoder};
 use super::Marker;
 use crate::*;
 

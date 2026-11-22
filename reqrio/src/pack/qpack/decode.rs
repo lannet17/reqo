@@ -176,7 +176,7 @@ mod tests {
     use crate::pack::qpack::decode::QPackDecode;
     use crate::stream::StreamMessage;
     use crate::{HttpStatus, Method, hex};
-    use reqtls::Reader;
+    use reqo_base::Reader;
 
     #[test]
     fn test_qpack_decode1() {

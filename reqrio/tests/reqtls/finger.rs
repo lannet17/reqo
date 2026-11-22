@@ -1,7 +1,7 @@
 #![allow(unused)]
 use std::{env, fs};
 use std::sync::LazyLock;
-use reqrio::{Fingerprint, H2Finger};
+use reqo::{Fingerprint, H2Finger};
 use reqtls::*;
 
 pub const JA3: &str = "771,4865-4866-4867-49195-49199-49196-49200-52393-52392-49171-49172-156-157-47-53,18-45-5-10-11-16-23-27-0-13-35-65281-43-51-17613,29-23-24,0";

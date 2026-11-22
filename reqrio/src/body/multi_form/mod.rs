@@ -15,7 +15,7 @@ pub use file_form::FileForm;
 
 /// * File upload example
 /// ```no_run
-/// use reqrio::*;
+/// use reqo::*;
 /// let data=json::object!{"key":"value"};
 /// let mut file=HttpFile::new_path_data(data,"path/to/file1").unwrap();
 /// file.add_form(FileForm::new_path("path/to/file2").unwrap());

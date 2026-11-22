@@ -7,7 +7,7 @@ use crate::stream::quic::QUICStream;
 use crate::stream::quic::Queue;
 use crate::stream::{SendParam, StreamMessage};
 use crate::*;
-use reqtls::quic::{self, QUICFrameFlag};
+use reqo_base::quic::{self, QUICFrameFlag};
 use std::collections::HashMap;
 
 pub struct H3StreamParam {
@@ -338,8 +338,8 @@ struct RecvParam1<'a> {
 mod tests {
     use super::HTTP3Stream;
     use crate::packet::H3FrameType;
-    use reqtls::Writer;
-    use reqtls::quic::QUICFrameFlag;
+    use reqo_base::Writer;
+    use reqo_base::quic::QUICFrameFlag;
 
     #[test]
     fn test_frame_head_encode() {

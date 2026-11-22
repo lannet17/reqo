@@ -1,6 +1,6 @@
 use crate::error::HlsResult;
 use std::fmt::{Debug, Formatter};
-use reqtls::{BufferError, Reader, Writer};
+use reqo_base::{BufferError, Reader, Writer};
 
 #[derive(PartialEq, Clone)]
 pub enum H2Setting {

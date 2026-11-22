@@ -1,6 +1,6 @@
 use crate::error::HlsResult;
 use crate::stream::quic::QUICStream;
-use reqtls::quic::{QUICError, QUICFrame};
+use reqo_base::quic::{QUICError, QUICFrame};
 use std::mem;
 use std::ops::{Deref, DerefMut};
 #[cfg(feature = "aync")]

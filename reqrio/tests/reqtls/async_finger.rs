@@ -1,6 +1,6 @@
 #![cfg(feature = "aync")]
 mod finger;
-use reqrio::{Fingerprint, HttpStatus, ReqExt, AcReq};
+use reqo::{Fingerprint, HttpStatus, ReqExt, AcReq};
 
 #[tokio::test]
 async fn test_ja3() {

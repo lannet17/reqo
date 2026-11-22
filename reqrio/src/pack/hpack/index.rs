@@ -1,6 +1,6 @@
 use super::decode::HPackDecodeBuf;
 use crate::pack::PackError;
-use reqtls::{BufferError, Writer};
+use reqo_base::{BufferError, Writer};
 use std::ops::AddAssign;
 
 pub enum Index {

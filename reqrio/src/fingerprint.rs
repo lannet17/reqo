@@ -1,28 +1,16 @@
+//! HTTP/2 and HTTP/3 connection-level fingerprint (SETTINGS frames, priority).
+//!
+//! TLS ClientHello fingerprinting is no longer part of reqrio itself: it is a
+//! property of the TLS backend (see [`crate::tls::TlsConnector`]).
+
 use crate::*;
-use std::ffi::CString;
-#[cfg(debug_assertions)]
-use std::fmt::Debug;
-use std::os::raw::{c_char, c_int};
-use std::slice;
-use std::sync::Arc;
-
-unsafe extern "C" {
-    fn Finger_build_h2(finger: *const Finger, writer: *mut Writer) -> c_int;
-    #[cfg(feature = "quic")]
-    fn Finger_build_h3(finger: *const Finger, writer: *mut Writer) -> c_int;
-    fn get_compute_id() -> *const u8;
-}
-
 
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub struct H2Finger {
-    ///setting frame
+    /// Frames sent right after the connection preface (SETTINGS, WINDOW_UPDATE, ...).
     pub frames: Vec<H2Frame<'static>>,
-    ///weight
     pub weight: u8,
-    ///priority
     pub priority: bool,
-    pub adv: Option<Arc<Finger>>,
 }
 
 impl Default for H2Finger {
@@ -39,19 +27,12 @@ impl Default for H2Finger {
             ],
             weight: 147,
             priority: true,
-            adv: None,
         }
     }
 }
 
 impl H2Finger {
     pub fn build_settings(&self, writer: &mut Writer) -> Result<(), BufferError> {
-        if let Some(ref adv) = self.adv {
-            let start = writer.end();
-            let ret = unsafe { Finger_build_h2(adv.as_ref(), writer) };
-            if ret != 1 { return Err(BufferError::InvalidCEncode); }
-            if start != writer.end() { return Ok(()); }
-        }
         for frame in self.frames.iter() {
             frame.write_to(writer)?;
         }
@@ -73,24 +54,16 @@ impl H2Finger {
     }
 }
 
-
 /// H3 frames; used only for the post-handshake `settings` stream.
 #[cfg(feature = "quic")]
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub struct H3Finger {
     pub frames: Vec<H3Frame<'static>>,
-    pub adv: Option<Arc<Finger>>,
 }
 
 #[cfg(feature = "quic")]
 impl H3Finger {
     pub fn build_settings(&self, writer: &mut Writer) -> Result<(), BufferError> {
-        if let Some(ref adv) = self.adv {
-            let start = writer.end();
-            let ret = unsafe { Finger_build_h3(adv.as_ref(), writer) };
-            if ret != 1 { return Err(BufferError::InvalidCEncode); }
-            if start != writer.end() { return Ok(()); }
-        }
         for frame in self.frames.iter() {
             frame.write_to(writer)?;
         }
@@ -118,227 +91,32 @@ impl Default for H3Finger {
                     payload: H3Payload::Bytes(Buf::new_ref(&[0x54]))
                 },
             ],
-            adv: None,
         }
     }
 }
 
 
-/// TLS fingerprint profile and associated HTTP/2 and HTTP/3 settings.
+/// HTTP-level fingerprint: HTTP/2 (and HTTP/3) connection settings.
 #[cfg_attr(debug_assertions, derive(Debug))]
+#[derive(Default)]
 pub struct Fingerprint {
-    tls: TlsFinger<'static>,
     h2: H2Finger,
     #[cfg(feature = "quic")]
     h3: H3Finger,
-    /// Built-in fingerprints and VIP fingerprints.
-    pub(crate) adv: Option<Arc<Finger>>,
-    /// Whether to use the full `sec-*` request headers.
-    pub(crate) sec_full: bool,
 }
 
 impl Fingerprint {
-    /// Load a built-in fingerprint by index.
-    ///
-    /// * `idx` - built-in fingerprint index.
-    /// * `auth` - authorization token.
-    /// * `sec_full` - whether to include full `sec-*` headers.
-    pub fn from_idx(idx: usize, auth: &str, path: Option<&str>, sec_full: bool) -> HlsResult<Fingerprint> {
-        let cpath = CString::new(path.unwrap_or("."))?;
-        let finger = Finger::from_idx(idx, auth.as_bytes(), cpath.as_ref())?;
-        Ok(Fingerprint::from_adv(finger, sec_full))
+    pub fn new_h2(h2: H2Finger) -> Self {
+        Fingerprint { h2, ..Default::default() }
     }
 
-    /// Load a built-in fingerprint by name.
-    ///
-    /// * `name` - built-in fingerprint name.
-    /// * `token` - authorization token.
-    /// * `sec_full` - whether to include full `sec-*` headers.
-    pub fn from_builtin(name: &'static str, token: &str, sec_full: bool) -> HlsResult<Fingerprint> {
-        Fingerprint::check_subscription(token);
-        let finger = Finger::from_builtin(name)?;
-        Ok(Fingerprint::from_adv(finger, sec_full))
-    }
+    pub fn h2(&self) -> &H2Finger { &self.h2 }
 
-    pub fn from_adv(finger: Finger, sec_full: bool) -> Fingerprint {
-        let finger = Arc::new(finger);
-        Fingerprint {
-            tls: TlsFinger::Adv(finger.clone()),
-            h2: H2Finger {
-                adv: Some(finger.clone()),
-                ..Default::default()
-            },
-            #[cfg(feature = "quic")]
-            h3: H3Finger {
-                adv: Some(finger.clone()),
-                ..Default::default()
-            },
-            adv: Some(finger),
-            sec_full,
-        }
-    }
-
-
-    /// Create a custom TLS fingerprint from explicit protocol versions.
-    ///
-    /// * `record_version` - record layer version.
-    /// * `message_version` - handshake message version.
-    /// * `token` - authorization token.
-    pub fn new_custom(record_version: Version, message_version: Version, token: impl AsRef<str>) -> Fingerprint {
-        Fingerprint::check_subscription(token);
-        Fingerprint {
-            tls: TlsFinger::Custom {
-                record_version,
-                message_version,
-                suites: vec![],
-                extensions: vec![],
-            },
-            h2: H2Finger {
-                frames: vec![],
-                weight: 0,
-                priority: false,
-                adv: None,
-            },
-            #[cfg(feature = "quic")]
-            h3: H3Finger {
-                frames: vec![],
-                adv: None,
-            },
-            adv: None,
-            sec_full: false,
-        }
-    }
-
-    pub fn new_h2(tls: TlsFinger<'static>, h2: H2Finger, token: impl AsRef<str>) -> Self {
-        Fingerprint::check_subscription(token);
-        Fingerprint {
-            tls,
-            h2,
-            #[cfg(feature = "quic")]
-            h3: H3Finger::default(),
-            adv: None,
-            sec_full: false,
-        }
-    }
+    pub fn h2_mut(&mut self) -> &mut H2Finger { &mut self.h2 }
 
     #[cfg(feature = "quic")]
-    pub fn new_h3(tls: TlsFinger<'static>, h3: H3Finger, token: impl AsRef<str>) -> Self {
-        Fingerprint::check_subscription(token);
-        Fingerprint {
-            tls,
-            h2: H2Finger::default(),
-            h3,
-            adv: None,
-            sec_full: false,
-        }
-    }
-
-    pub fn new_tls(tls: TlsFinger<'static>, token: impl AsRef<str>) -> Self {
-        Fingerprint::check_subscription(token);
-        Fingerprint {
-            tls,
-            ..Default::default()
-        }
-    }
-
-    pub fn h2(&self) -> &H2Finger {
-        &self.h2
-    }
-
-    pub fn h2_mut(&mut self) -> &mut H2Finger {
-        &mut self.h2
-    }
-
-    pub fn tls(&self) -> &TlsFinger<'_> { &self.tls }
-
-    pub fn tls_mut(&mut self) -> &mut TlsFinger<'static> { &mut self.tls }
+    pub fn h3(&self) -> &H3Finger { &self.h3 }
 
     #[cfg(feature = "quic")]
-    pub fn h3(&self) -> &H3Finger {
-        &self.h3
-    }
-
-    #[cfg(feature = "quic")]
-    pub fn h3_mut(&mut self) -> &mut H3Finger {
-        &mut self.h3
-    }
-
-    pub fn compute_id() -> String {
-        let id = unsafe { slice::from_raw_parts(get_compute_id(), 32) };
-        hex::encode(id)
-    }
-}
-
-impl Fingerprint {
-    /// Create a random fingerprint.
-    ///
-    /// * `token` - authorization token.
-    pub fn random(token: impl AsRef<str>) -> Fingerprint {
-        Fingerprint::check_subscription(token);
-        Fingerprint {
-            tls: TlsFinger::random(),
-            ..Default::default()
-        }
-    }
-
-    ///client hello bytes prefix: [1, 0, .]
-    pub fn from_client_hello(record_version: Version, ch: Vec<u8>, token: impl AsRef<str>) -> HlsResult<Fingerprint> {
-        Fingerprint::check_subscription(token);
-        Ok(Fingerprint {
-            tls: TlsFinger::ClientHello { record_version, bytes: Buf::Vec(ch) },
-            ..Default::default()
-        })
-    }
-
-    ///record hex prefix: 220303
-    pub fn from_record_hex(hex_str: impl AsRef<str>, token: impl AsRef<str>) -> HlsResult<Fingerprint> {
-        Fingerprint::check_subscription(token);
-        Ok(Fingerprint {
-            tls: TlsFinger::from_record_hex(hex_str)?,
-            ..Default::default()
-        })
-    }
-
-    pub fn from_ja3(ja3: impl AsRef<str>, token: impl AsRef<str>) -> HlsResult<Fingerprint> {
-        Fingerprint::check_subscription(token);
-        Ok(Fingerprint {
-            tls: TlsFinger::from_ja3(ja3)?,
-            ..Default::default()
-        })
-    }
-
-    pub fn from_ja4(ja4: impl AsRef<str>, token: impl AsRef<str>) -> HlsResult<Fingerprint> {
-        Fingerprint::check_subscription(token);
-        Ok(Fingerprint {
-            tls: TlsFinger::from_ja4(ja4)?,
-            ..Default::default()
-        })
-    }
-
-    pub fn check_subscription(token: impl AsRef<str>) -> bool {
-        unsafe extern "C" {
-            fn is_subscription(token: *const c_char) -> bool;
-        }
-        let is_subscribed = unsafe {
-            let token = CString::from_vec_unchecked(token.as_ref().to_string().into_bytes());
-            is_subscription(token.as_ptr())
-        };
-        if !is_subscribed {
-            println!("\x1b[01;33m[Fingerprint] WARN \x1b[0m You have not subscribed yet, so this call will be ignored.");
-        }
-        is_subscribed
-    }
-}
-
-impl Default for Fingerprint {
-    fn default() -> Fingerprint {
-        Fingerprint {
-            tls: TlsFinger::Default,
-            h2: H2Finger::default(),
-            #[cfg(feature = "quic")]
-            h3: H3Finger::default(),
-            adv: None,
-            sec_full: false,
-        }
-    }
+    pub fn h3_mut(&mut self) -> &mut H3Finger { &mut self.h3 }
 }

@@ -1,13 +1,15 @@
 [workspace]
 resolver = "1"
 members = [
-    "reqrio"
+    "base",
+    "reqrio",
 ]
+exclude = ["reqtls"]
 
 [workspace.dependencies]
 serde = { version = "1.0", features = ["derive"] }
 reqrio-json = { path = "json", version = "0.1.13" }
-reqtls = { path = "reqtls", version = "=0.4.2" }
+reqo-base = { path = "base", version = "0.5.0" }
 
 [profile.release]
 opt-level = 3

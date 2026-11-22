@@ -1,6 +1,6 @@
 #[cfg(debug_assertions)]
 use std::fmt::{Debug, Formatter};
-use reqtls::{quic, Buf, Writer, BufferError, Reader};
+use reqo_base::{quic, Buf, Writer, BufferError, Reader};
 use crate::HlsError;
 use crate::pack::{QPackDecode, QPackType};
 

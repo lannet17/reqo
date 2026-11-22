@@ -2,7 +2,7 @@
 use std::pin::Pin;
 #[cfg(feature = "aync")]
 use std::task::{Context, Poll};
-use reqtls::coder::{CodeType, TZCoder};
+use reqo_base::coder::{CodeType, TZCoder};
 use crate::error::HlsResult;
 use crate::stream::write::StreamShutdown;
 use crate::stream::Stream;

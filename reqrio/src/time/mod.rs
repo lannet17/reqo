@@ -390,7 +390,7 @@ impl Time {
     }
 
     pub fn time_uuid() -> Result<String, HlsError> {
-        let mut data = reqtls::hash::md5_hex(Time::now_nanos().to_be_bytes())?;
+        let mut data = reqo_base::hash::md5_hex(Time::now_nanos().to_be_bytes());
         data.insert(8, '-');
         data.insert(13, '-');
         data.insert(18, '-');

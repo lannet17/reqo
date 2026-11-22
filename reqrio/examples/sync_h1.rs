@@ -1,4 +1,4 @@
-use reqrio::*;
+use reqo::*;
 use std::sync::LazyLock;
 use std::{env, fs};
 
@@ -27,10 +27,9 @@ fn test_log() {
 fn main() {
     #[cfg(feature = "log")]
     test_log();
-    Fingerprint::check_subscription(TOKEN.as_str());
     let t = Time::now();
     let mut req = ScReq::new()
-        .with_alpn(ALPN::HTTP30)
+        .with_alpn(ALPN::HTTP20)
         .with_verify(false)
         .with_timeout(Timeout::new_same(3000, 1))
         .with_key_log("2.log")

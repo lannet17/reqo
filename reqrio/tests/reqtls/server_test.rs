@@ -3,7 +3,7 @@ use std::net::TcpListener;
 use std::time::Duration;
 #[cfg(feature = "aync")]
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use reqrio::*;
+use reqo::*;
 
 fn gen_ca() -> (Vec<u8>, Vec<u8>) {
     let mut ca_signer = CertSigner::root_siger(2048).unwrap();

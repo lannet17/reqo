@@ -1,5 +1,5 @@
 use crate::pack::qpack::QPackType;
-use reqtls::{BufferError, Reader, Writer};
+use reqo_base::{BufferError, Reader, Writer};
 
 #[derive(Debug)]
 #[cfg_attr(debug_assertions, derive(PartialEq))]
@@ -422,7 +422,7 @@ mod tests {
     use crate::hex;
     use crate::pack::qpack::index::Index;
     use crate::pack::qpack::QPackType;
-    use reqtls::{Writer, Reader};
+    use reqo_base::{Writer, Reader};
 
     #[test]
     fn test_qpack_index1() {

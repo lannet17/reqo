@@ -2,6 +2,7 @@ use crate::body::Body;
 use crate::ext::{ReqPriExt, ReqUrl};
 use crate::stream::{HTTPStream, SendParam, Stream};
 use crate::*;
+use crate::tls::{ClientIdentity, TlsConnector, TlsSettings, TlsVersion};
 use json::JsonValue;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
@@ -14,20 +15,14 @@ pub struct ScReq {
     timeout: Timeout,
     proxy: Proxy,
     fingerprint: Fingerprint,
-    verify: bool,
+    tls: TlsSettings,
     auto_redirect: bool,
     redirect_times: i32,
-    certs: Vec<Certificate>,
-    key: RsaKey,
-    ca_certs: Vec<Certificate>,
     alpn: ALPN,
-    key_log: Option<Arc<String>>,
     url: Url,
-    tls_session: Option<TlsSession>,
     pub ignore_order: bool,
     responses: HashMap<u64, StreamMessage>,
     recv_ids: HashSet<u64>,
-    version: Version,
 }
 
 impl Default for ScReq {
@@ -38,20 +33,14 @@ impl Default for ScReq {
             timeout: Timeout::default(),
             proxy: Proxy::Null,
             fingerprint: Fingerprint::default(),
-            verify: true,
+            tls: TlsSettings::default(),
             auto_redirect: true,
             redirect_times: i32::MAX,
-            certs: vec![],
-            key: RsaKey::none(),
-            ca_certs: vec![],
             alpn: ALPN::HTTP20,
-            key_log: None,
             url: Url::default(),
-            tls_session: None,
             ignore_order: false,
             responses: HashMap::with_capacity(20),
             recv_ids: HashSet::new(),
-            version: Version::TLS_1_3,
         }
     }
 }
@@ -180,9 +169,6 @@ impl ScReq {
                 redirect_times += 1;
                 continue;
             }
-            if self.tls_session.is_none() {
-                self.tls_session = self.stream.tls_session().cloned();
-            }
             return Ok(resp);
         }
         Err("redirection exceeds the maximum".into())
@@ -214,25 +200,15 @@ impl ScReq {
 
     pub fn re_conn(&mut self, url: Option<&Url>) -> HlsResult<()> {
         for i in 1..=self.timeout.connect_times() {
-            let config = ClientConfig {
-                sni: url.unwrap_or(&self.url).sni(),
-                alpn: &self.alpn,
-                fingerprint: self.fingerprint.tls(),
-                client_cert: &mut self.certs,
-                cert_key: &self.key,
-                verify: self.verify,
-                ca_certs: &mut self.ca_certs,
-                key_log: self.key_log.clone(),
-                session: self.tls_session.take(),
-                version: self.version,
-            };
+            let connector = self.tls.connector()?;
+            let config = self.tls.options(url.unwrap_or(&self.url).sni(), &self.alpn);
             let param = ConnParam {
                 url: url.unwrap_or(&self.url),
                 proxy: &self.proxy,
                 timeout: &self.timeout,
                 ech: false,
             };
-            match self.stream.conn_sync(config, param, &self.fingerprint) {
+            match self.stream.conn_sync(config, connector.as_ref(), param, &self.fingerprint) {
                 Ok(alpn) => {
                     #[cfg(feature = "log")]
                     debug!(
@@ -327,7 +303,7 @@ impl ReqExt for ScReq {
     }
 
     fn set_verify(&mut self, verify: bool) {
-        self.verify = verify;
+        self.tls.verify = verify;
     }
 
     fn proxy(&self) -> &Proxy { &self.proxy }
@@ -341,30 +317,26 @@ impl ReqExt for ScReq {
     }
 
     fn set_key_log(&mut self, path: impl Into<String>) {
-        self.key_log = Some(Arc::new(path.into()));
+        self.tls.key_log = Some(Arc::new(path.into()));
     }
 
     fn set_alpn(&mut self, alpn: ALPN) {
         self.alpn = alpn;
     }
 
-    fn set_version(&mut self, version: Version) {
-        self.version = version;
+    fn set_version(&mut self, version: TlsVersion) {
+        self.tls.version = version;
     }
 
-    fn set_mtls(&mut self, certs: Vec<Certificate>, key: RsaKey, ca: Option<Vec<Certificate>>) {
-        self.certs = certs;
-        self.ca_certs = ca.unwrap_or(vec![]);
-        self.key = key;
+    fn set_mtls(&mut self, identity: ClientIdentity, ca_pem: Option<Vec<u8>>) {
+        self.tls.identity = Some(identity);
+        self.tls.ca_pem = ca_pem;
     }
 
-    fn set_tls_session(&mut self, tls_session: Option<TlsSession>) {
-        self.tls_session = tls_session;
+    fn set_tls_connector(&mut self, connector: Arc<dyn TlsConnector>) {
+        self.tls.connector = Some(connector);
     }
 
-    fn tls_session(&self) -> Option<&TlsSession> {
-        self.stream.tls_session()
-    }
     fn fingerprint_mut(&mut self) -> &mut Fingerprint {
         &mut self.fingerprint
     }

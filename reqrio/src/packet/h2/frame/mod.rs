@@ -1,6 +1,6 @@
 use crate::error::HlsResult;
 pub use flag::H2FrameFlag;
-use reqtls::{Buf, BufferError, Reader, Writer, u24};
+use reqo_base::{Buf, BufferError, Reader, Writer, u24};
 pub use setting::H2Setting;
 pub use typo::H2FrameType;
 

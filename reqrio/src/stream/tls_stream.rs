@@ -1,10 +1,9 @@
-use super::connect::{ConnState, TlsConnecting};
-use crate::Timeout;
-use crate::stream::read::ChunkReading;
-use crate::stream::write::BufWriting;
-use reqtls::*;
+//! Thin wrappers around a backend's TLS stream (see [`crate::tls`]).
+
+use crate::tls::TlsIo;
 #[cfg(feature = "aync")]
-use std::cmp::min;
+use crate::tls::AsyncTlsIo;
+use crate::{Timeout, ALPN};
 use std::io;
 use std::io::{Read, Write};
 #[cfg(feature = "aync")]
@@ -14,218 +13,77 @@ use std::task::{Context, Poll};
 #[cfg(feature = "aync")]
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
-pub struct TlsStream<S> {
-    pub(super) conn: Connection,
-    stream: S,
-    encrypted_channel: bool,
-    pub(super) handshake_finished: bool,
-    hello_retrying: bool,
-    pub(super) read_buffer: Writer,
-    pub(super) write_buffer: Writer,
-    #[cfg(feature = "aync")]
-    shutdown_wrote: bool,
-    #[cfg(feature = "aync")]
-    write_offset: usize,
+/// Synchronous TLS stream produced by a [`TlsConnector`](crate::tls::TlsConnector).
+pub struct TlsStream {
+    inner: Box<dyn TlsIo>,
+    alpn: ALPN,
     #[cfg(feature = "aync")]
     pub(super) timeout: Timeout,
 }
 
-impl<S> TlsStream<S> {
-    pub(crate) fn new(conn: Connection, _timeout: Timeout, stream: S) -> TlsStream<S> {
+impl TlsStream {
+    pub(crate) fn new(inner: Box<dyn TlsIo>, _timeout: Timeout) -> TlsStream {
         TlsStream {
-            conn,
-            stream,
-            encrypted_channel: false,
-            handshake_finished: false,
-            hello_retrying: false,
-            read_buffer: Writer::with_capacity(16469),
-            write_buffer: Writer::with_capacity(16469),
+            alpn: inner.alpn(),
+            inner,
             #[cfg(feature = "aync")]
-            shutdown_wrote: false,
-            #[cfg(feature = "aync")]
-            write_offset: 0,
-            #[cfg(feature = "aync")]
-            timeout:_timeout,
+            timeout: _timeout,
         }
     }
 
-    pub fn connect(mut config: ClientConfig<'_>, timeout: Timeout, stream: S) -> TlsConnecting<'_, S> {
-        let session = config.session.as_ref().cloned().unwrap_or_default();
-        let conn = Connection::new_client(session, config.key_log.take(), false)
-            .with_verify(config.verify).with_mtls(!config.client_cert.is_empty());
-        TlsConnecting {
-            sent_client_hello: false,
-            state: ConnState::Connecting(Box::new(TlsStream::new(conn, timeout, stream))),
-            config: Config::Client(config),
-            app_buf: Writer::with_capacity(24657),
-            #[cfg(feature = "aync")]
-            timeout_reset: false,
-            sent_server_hello: false,
-        }
-    }
+    pub fn alpn(&self) -> &ALPN { &self.alpn }
 
-    pub fn accept(stream: S, mut config: ServerConfig<'_>) -> TlsConnecting<'_, S> {
-        let conn = Connection::new(TlsSession::default(), config.key_log.take(), false)
-            .with_verify(config.verify)
-            .with_named_curve(config.named_curve);
-        TlsConnecting {
-            sent_client_hello: true,
-            state: ConnState::Connecting(Box::new(TlsStream::new(conn, Timeout::longer(), stream))),
-            config: Config::Server(config),
-            app_buf: Writer::with_capacity(24657),
-            #[cfg(feature = "aync")]
-            timeout_reset: false,
-            sent_server_hello: false,
-        }
-    }
-
-    pub(super) fn write_buffer(&mut self) -> BufWriting<'_, S> {
-        BufWriting {
-            stream: &mut self.stream,
-            buf: &mut self.write_buffer,
-            #[cfg(feature = "aync")]
-            timeout: &mut self.timeout,
-            #[cfg(feature = "aync")]
-            timeout_reset: false,
-        }
-    }
-
-    pub(super) fn read_next_record(&mut self) -> ChunkReading<'_, S> {
-        ChunkReading {
-            len_size: 5,
-            func: Box::new(|filled| u16::from_be_bytes([filled[3], filled[4]]) as usize + 5),
-            stream: &mut self.stream,
-            buf: &mut self.read_buffer,
-            #[cfg(feature = "aync")]
-            timeout: &mut self.timeout,
-            #[cfg(feature = "aync")]
-            timeout_reset: false,
-        }
-    }
-
-    pub fn alpn(&self) -> &ALPN { self.conn.alpn() }
-
-    pub fn connection(&self) -> &Connection { &self.conn }
-
-    #[cfg(feature = "aync")]
-    pub fn set_timeout(&mut self, mut timeout: Timeout) {
-        timeout.reset_read();
-        timeout.reset_write();
-        timeout.reset_connect();
-        self.timeout = timeout;
-    }
+    pub fn shutdown(&mut self) -> io::Result<()> { self.inner.shutdown() }
 }
 
-impl<S: Write> TlsStream<S> {
-    pub fn shutdown(&mut self) -> io::Result<()> {
-        self.write_buffer.reset();
-        let out = self.write_buffer.unfilled();
-        let record_len = self.conn.make_message(RecordType::Alert, &[1, 0], out)?;
-        self.write_buffer.add_len(record_len);
-        self.write_buffer().wait()
-    }
+impl Read for TlsStream {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> { self.inner.read(buf) }
 }
 
-impl<S: Read> Read for TlsStream<S> {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        loop {
-            let record_len = self.read_next_record().wait()?;
-            let size = self.handle_record(record_len, None, buf)?;
-            self.read_buffer.used_empty(record_len);
-            if size > 0 { return Ok(size); }
-        }
-    }
+impl Write for TlsStream {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> { self.inner.write(buf) }
+
+    fn flush(&mut self) -> io::Result<()> { self.inner.flush() }
 }
+
+/// Asynchronous TLS stream produced by a [`TlsConnector`](crate::tls::TlsConnector).
 #[cfg(feature = "aync")]
-impl<S: AsyncRead + Unpin> AsyncRead for TlsStream<S> {
+pub struct AsyncTlsStream {
+    inner: Box<dyn AsyncTlsIo>,
+    alpn: ALPN,
+    pub(super) timeout: Timeout,
+}
+
+#[cfg(feature = "aync")]
+impl AsyncTlsStream {
+    pub(crate) fn new(inner: Box<dyn AsyncTlsIo>, timeout: Timeout) -> AsyncTlsStream {
+        AsyncTlsStream { alpn: inner.alpn(), inner, timeout }
+    }
+
+    pub fn alpn(&self) -> &ALPN { &self.alpn }
+}
+
+#[cfg(feature = "aync")]
+impl AsyncRead for AsyncTlsStream {
     fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
-        if self.shutdown_wrote { return Poll::Ready(Ok(())); }
-        let stream = self.get_mut();
-        loop {
-            let mut record = stream.read_next_record();
-            let record_len = match Pin::new(&mut record).poll(cx)? {
-                Poll::Ready(len) => len,
-                Poll::Pending => return Poll::Pending,
-            };
-            let len = stream.handle_record(record_len, None, buf.initialized_mut())?;
-            stream.read_buffer.used_empty(record_len);
-            if len == 0 { continue; }
-            buf.set_filled(len);
-            return Poll::Ready(Ok(()));
+        match Pin::new(&mut self.get_mut().inner).poll_read(cx, buf) {
+            Poll::Ready(Err(e)) if e.kind() == io::ErrorKind::UnexpectedEof => Poll::Ready(Ok(())),
+            res => res,
         }
     }
 }
 
-impl<S: Write> Write for TlsStream<S> {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        for chunk in buf.chunks(16384) {
-            self.write_buffer.reset();
-            let record_len = self.conn.make_message(RecordType::ApplicationData, chunk, self.write_buffer.unfilled())?;
-            self.write_buffer.add_len(record_len);
-            self.write_buffer().wait()?;
-        }
-        Ok(buf.len())
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        self.stream.flush()
-    }
-}
 #[cfg(feature = "aync")]
-impl<S: AsyncWrite + Unpin> AsyncWrite for TlsStream<S> {
+impl AsyncWrite for AsyncTlsStream {
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
-        let stream = self.get_mut();
-        loop {
-            if stream.write_offset == buf.len() && stream.write_buffer.is_empty() { break; }
-            if stream.write_buffer.is_empty() {
-                let chunk_size = min(16384, buf.len());
-                let chunk = &buf[stream.write_offset..stream.write_offset + chunk_size];
-                let record_len = stream.conn.make_message(RecordType::ApplicationData, chunk, stream.write_buffer.unfilled())?;
-                stream.write_buffer.add_len(record_len);
-                stream.write_offset += chunk_size;
-            }
-            let mut writer = stream.write_buffer();
-            if Pin::new(&mut writer).poll(cx)?.is_pending() { return Poll::Pending; }
-        }
-        assert_eq!(stream.write_offset, buf.len());
-        stream.write_offset = 0;
-        Poll::Ready(Ok(buf.len()))
+        Pin::new(&mut self.get_mut().inner).poll_write(cx, buf)
     }
 
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        Pin::new(&mut self.stream).poll_flush(cx)
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.get_mut().inner).poll_flush(cx)
     }
 
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        let stream = self.get_mut();
-        if stream.write_buffer.is_empty() {
-            let len = stream.conn.make_message(RecordType::Alert, &Alert::close_notify().to_bytes(), stream.write_buffer.unfilled())?;
-            stream.write_buffer.add_len(len);
-        }
-        match stream.shutdown_wrote {
-            true => Pin::new(&mut stream.stream).poll_shutdown(cx),
-            false => {
-                let mut writer = stream.write_buffer();
-                match Pin::new(&mut writer).poll(cx)? {
-                    Poll::Ready(_) => {
-                        stream.shutdown_wrote = true;
-                        Pin::new(&mut stream.stream).poll_shutdown(cx)
-                    }
-                    Poll::Pending => Poll::Pending,
-                }
-            }
-        }
-    }
-}
-
-impl<S> StreamHandle for TlsStream<S> {
-    fn stream_param(&mut self) -> (&Writer, StreamParam<'_>) {
-        (&self.read_buffer, StreamParam {
-            handshake_finish: &mut self.handshake_finished,
-            encrypted_channel: &mut self.encrypted_channel,
-            hello_retrying: &mut self.hello_retrying,
-            write_buffer: &mut self.write_buffer,
-            conn: &mut self.conn,
-        })
+        Pin::new(&mut self.get_mut().inner).poll_shutdown(cx)
     }
 }

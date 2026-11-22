@@ -1,5 +1,5 @@
 mod finger;
-use reqrio::{Fingerprint, HttpStatus, ReqExt, ScReq};
+use reqo::{Fingerprint, HttpStatus, ReqExt, ScReq};
 
 #[test]
 fn test_ja3() {

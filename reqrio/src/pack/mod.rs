@@ -10,7 +10,7 @@ pub use hpack::{HPackCoding, HPackDecode, HPackDecodeBuf, HPackEncode};
 pub use item::PackItem;
 #[cfg(feature = "quic")]
 pub use qpack::{QPackDecode, QPackEncode, QPackType};
-use reqtls::{BufferError, Reader, Writer};
+use reqo_base::{BufferError, Reader, Writer};
 
 pub fn decode_integer(buf: &mut Reader) -> Result<usize, BufferError> {
     let mut res = 0;

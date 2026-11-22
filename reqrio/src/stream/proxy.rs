@@ -55,7 +55,7 @@ impl Proxy {
                 writer.write_slice(b"\r\n")?;
                 if !v.username().is_empty() && !v.password().is_empty() {
                     writer.write_slice(b"Proxy-Authorization: Basic ")?;
-                    let auth = base64::b64encode(format!("{}:{}", v.username(), v.password()))?;
+                    let auth = base64::b64encode(format!("{}:{}", v.username(), v.password()));
                     writer.write_slice(auth.as_bytes())?;
                     writer.write_slice(b"\r\n")?;
                 }

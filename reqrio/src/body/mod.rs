@@ -10,7 +10,7 @@ pub use ext::{BodyData, BodyExt};
 pub use multi_form::{FileForm, FormError, HttpFile};
 pub use reader::RawBodyReader;
 use reqrio_json::JsonValue;
-use reqtls::{hash, rand};
+use reqo_base::{hash, rand};
 #[cfg(feature = "serde")]
 use serde::Serialize;
 use std::borrow::Cow;
@@ -122,7 +122,7 @@ impl<'a> From<String> for Body<'a> {
 impl<'a> From<HttpFile> for Body<'a> {
     fn from(file: HttpFile) -> Body<'a> {
         let r = rand::random::<[u8; 16]>();
-        let md5 = hash::md5_hex(r).unwrap_or_else(|_| hex::encode(r));
+        let md5 = hash::md5_hex(r);
         let boundary = Arc::new(format!("----WebKitFormBoundary{}", &md5[..16]));
         Body {
             ct: ContentType::File(boundary.clone()),
@@ -210,11 +210,10 @@ impl<'a> Body<'a> {
     /// Serialize the body to raw bytes.
     pub fn to_vec(&self) -> HlsResult<Vec<u8>> {
         let mut body = self.as_reader()?;
-        let mut res = vec![0; body.len()];
-        let mut reader = Writer::from_ptr(res.as_mut_ptr(), res.len());
-        let len = body.read(&mut reader)?;
-        assert_eq!(len, res.len());
-        Ok(res)
+        let mut writer = Writer::with_capacity(body.len());
+        let len = body.read(&mut writer)?;
+        assert_eq!(len, writer.len());
+        Ok(writer.filled().to_vec())
     }
 
     /// Serialize the body to UTF-8 text.

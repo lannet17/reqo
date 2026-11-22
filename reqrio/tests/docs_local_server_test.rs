@@ -5,7 +5,7 @@
 //! 用进程内 TCP 服务器精确验证请求方法、请求体、查询参数、请求头、重定向、
 //! Cookie、流式响应、大响应体、状态码与连接复用，不依赖公网。
 
-use reqrio::*;
+use reqo::*;
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};

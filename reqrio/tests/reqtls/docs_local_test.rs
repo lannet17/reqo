@@ -8,7 +8,7 @@
 
 #![allow(clippy::redundant_clone)]
 
-use reqrio::*;
+use reqo::*;
 use std::env;
 use std::fs;
 use std::sync::LazyLock;

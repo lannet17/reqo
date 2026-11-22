@@ -12,10 +12,10 @@ mod write;
 mod connect;
 mod message;
 
-use crate::stream::connect::{ConnState, HTTPStreamConnect, TlsConnecting};
 use crate::stream::read::StreamRead;
 use crate::stream::write::{StreamShutdown, StreamWrite};
 use crate::*;
+use crate::tls::{TlsConnector, TlsOptions};
 use http1::HTTP1Stream;
 use http2::HTTP2Stream;
 #[cfg(feature = "quic")]
@@ -105,22 +105,6 @@ impl HTTPStream {
             HTTPStream::AsyncH3(_) => Err(io::Error::other("use `HTTPStreamA`")),
         }
     }
-
-    pub fn tls_session(&self) -> Option<&TlsSession> {
-        match self {
-            HTTPStream::NonConnection => None,
-            HTTPStream::SyncH1(h1) => h1.stream().tls_session(),
-            HTTPStream::SyncH2(h2) => h2.stream().tls_session(),
-            #[cfg(feature = "quic")]
-            HTTPStream::SyncH3(_) => None,
-            #[cfg(feature = "aync")]
-            HTTPStream::AsyncH1(h1) => h1.stream().tls_session(),
-            #[cfg(feature = "aync")]
-            HTTPStream::AsyncH2(h2) => h2.stream().tls_session(),
-            #[cfg(all(feature = "aync", feature = "quic"))]
-            HTTPStream::AsyncH3(_) => None,
-        }
-    }
 }
 
 
@@ -149,8 +133,8 @@ impl HTTPStream {
         }
     }
 
-    pub(crate) fn conn_sync(&mut self, config: ClientConfig, param: ConnParam, finger: &Fingerprint) -> HlsResult<ALPN> {
-        match config.alpn {
+    pub(crate) fn conn_sync(&mut self, tls: TlsOptions, connector: &dyn TlsConnector, param: ConnParam, finger: &Fingerprint) -> HlsResult<ALPN> {
+        match tls.alpn.first().cloned().unwrap_or_default() {
             #[cfg(feature = "quic")]
             h3 if h3 == ALPN::HTTP30 => {
                 let socket = std::net::UdpSocket::bind("0.0.0.0:0")?;
@@ -165,7 +149,7 @@ impl HTTPStream {
                 let stream = std::net::TcpStream::connect_timeout(&addr, param.timeout.connect())?;
                 stream.set_read_timeout(Some(param.timeout.read()))?;
                 stream.set_write_timeout(Some(param.timeout.write()))?;
-                let (alpn, stream) = Stream::connect(config, param, finger, stream).wait()?;
+                let (alpn, stream) = HTTPStream::connect_tcp_sync(stream, &tls, connector, &param, finger)?;
                 *self = stream;
                 Ok(alpn)
             }
@@ -197,8 +181,8 @@ impl HTTPStream {
         }
     }
 
-    pub(crate) async fn conn_async(&mut self, config: ClientConfig<'_>, param: ConnParam<'_>, finger: &Fingerprint) -> HlsResult<ALPN> {
-        match config.alpn {
+    pub(crate) async fn conn_async(&mut self, tls: TlsOptions<'_>, connector: &dyn TlsConnector, param: ConnParam<'_>, finger: &Fingerprint) -> HlsResult<ALPN> {
+        match tls.alpn.first().cloned().unwrap_or_default() {
             #[cfg(feature = "quic")]
             h3 if h3 == ALPN::HTTP30 => {
                 let socket = tokio::net::UdpSocket::bind("0.0.0.0:0").await?;
@@ -213,7 +197,7 @@ impl HTTPStream {
                 let connect = tokio::net::TcpStream::connect(addr);
                 let stream = tokio::time::timeout(param.timeout.connect(), connect).await
                     .or(Err(TimeError::ConnectTimeout))??;
-                let (alpn, stream) = Stream::connect(config, param, finger, stream).await?;
+                let (alpn, stream) = HTTPStream::connect_tcp_async(stream, tls, connector, &param, finger).await?;
                 *self = stream;
                 Ok(alpn)
             }
@@ -226,12 +210,12 @@ pub enum Stream {
     NonConnection,
     // Synchronous
     SyncHttp(ProxyStream<std::net::TcpStream>),
-    SyncHttps(TlsStream<ProxyStream<std::net::TcpStream>>),
+    SyncHttps(TlsStream),
     // Asynchronous
     #[cfg(feature = "aync")]
     AsyncHttp(ProxyStream<tokio::net::TcpStream>),
     #[cfg(feature = "aync")]
-    AsyncHttps(TlsStream<ProxyStream<tokio::net::TcpStream>>),
+    AsyncHttps(AsyncTlsStream),
 }
 
 impl Stream {
@@ -247,20 +231,12 @@ impl Stream {
         }
     }
 
-    pub fn tls_session(&self) -> Option<&TlsSession> {
+    /// Negotiated ALPN of the TLS layer, if any.
+    pub fn alpn(&self) -> Option<&ALPN> {
         match self {
-            Stream::SyncHttps(s) => Some(s.connection().session()),
+            Stream::SyncHttps(s) => Some(s.alpn()),
             #[cfg(feature = "aync")]
-            Stream::AsyncHttps(s) => Some(s.connection().session()),
-            _ => None
-        }
-    }
-
-    pub fn tls_conn(&self) -> Option<&Connection> {
-        match self {
-            Stream::SyncHttps(s) => Some(s.connection()),
-            #[cfg(feature = "aync")]
-            Stream::AsyncHttps(s) => Some(s.connection()),
+            Stream::AsyncHttps(s) => Some(s.alpn()),
             _ => None
         }
     }
@@ -293,29 +269,6 @@ impl Stream {
     pub fn shutdown(&mut self) -> StreamShutdown<'_> {
         StreamShutdown {
             stream: self
-        }
-    }
-
-    pub fn connect<'a, S>(config: ClientConfig<'a>, param: ConnParam<'a>, finger: &'a Fingerprint, stream: S) -> HTTPStreamConnect<'a, S> {
-        HTTPStreamConnect {
-            proxy_connecting: ProxyStream::connect(stream, param.url.addr(), param.proxy, param.timeout.clone()),
-            param,
-            fingerprint: finger,
-            tls_connecting: TlsConnecting {
-                sent_client_hello: false,
-                sent_server_hello: false,
-                config: Config::Client(config),
-                state: ConnState::Connected,
-                app_buf: Writer::with_capacity(32876),
-                #[cfg(feature = "aync")]
-                timeout_reset: false,
-            },
-            #[cfg(feature = "aync")]
-            proxy_connected: false,
-            #[cfg(feature = "aync")]
-            stream: Stream::NonConnection,
-            #[cfg(feature = "aync")]
-            tls_connected: false,
         }
     }
 

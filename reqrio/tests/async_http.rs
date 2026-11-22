@@ -1,5 +1,5 @@
-use reqrio::{Application, BodyData, ContentType, FileForm, HttpFile, HttpStatus, ImageType, Method, ReqExt, AcReq, Text, UrlExt, json, Body};
-use reqtls::{ALPN, base64, coder, rand};
+use reqo::{Application, BodyData, ContentType, FileForm, HttpFile, HttpStatus, ImageType, Method, ReqExt, AcReq, Text, UrlExt, json, Body};
+use reqo::{ALPN, base64, coder, rand};
 
 ///Testing different types of requests
 pub async fn http_get_matrix(req: &mut AcReq, alpn: ALPN) {

@@ -1,6 +1,6 @@
 mod finger;
 
-use reqrio::{Fingerprint, ReqExt, ReqStreamExt, ScReq, Timeout};
+use reqo::{Fingerprint, ReqExt, ReqStreamExt, ScReq, Timeout};
 use reqtls::{CipherSuite, NamedCurve, Version, ALPN};
 use crate::finger::{build_finger, DEFAULT_SIGNATURE};
 

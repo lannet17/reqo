@@ -4,7 +4,8 @@ use crate::stream::{HTTPStream, Stream, StreamMessage};
 use crate::*;
 use json::JsonValue;
 use std::collections::HashMap;
-use std::slice;
+use std::sync::Arc;
+use crate::tls::{ClientIdentity, TlsConnector, TlsVersion};
 
 pub trait ReqExt: Sized {
     fn header_mut(&mut self) -> &mut Header;
@@ -69,56 +70,38 @@ pub trait ReqExt: Sized {
     }
 
     /// * Must be set before establishing the TLS connection; otherwise call `re_conn`.
-    /// * TLS 1.3 is used by default; the actual protocol is negotiated with the server.
-    fn set_version(&mut self, version: Version);
-    fn with_version(mut self, version: Version) -> Self {
+    /// * TLS 1.3 is offered by default; the actual version is negotiated with the server.
+    fn set_version(&mut self, version: TlsVersion);
+    fn with_version(mut self, version: TlsVersion) -> Self {
         self.set_version(version);
         self
     }
 
-    /// Enable mTLS and provide the client certificate.
+    /// Enable mTLS with a PEM client certificate chain + key, and optionally
+    /// restrict trusted roots to the given PEM CA bundle.
     ///```no_run
-    /// use reqrio::*;
+    /// use reqo::*;
+    /// use reqo::tls::ClientIdentity;
     ///
-    /// let mut req=ScReq::new();
-    /// let certs=Certificate::from_pem_file("path/to/cert").unwrap();
-    /// let key=RsaKey::from_pri_pem_file("path/to/cert/key").unwrap();
-    /// req.set_mtls(certs,key,None);
+    /// let mut req = ScReq::new();
+    /// let id = ClientIdentity::from_pem_files("client.pem", "client.key").unwrap();
+    /// req.set_mtls(id, None);
     /// ```
-    fn set_mtls(&mut self, certs: Vec<Certificate>, key: RsaKey, ca: Option<Vec<Certificate>>);
-    fn with_mtls(mut self, certs: Vec<Certificate>, key: RsaKey, ca: Option<Vec<Certificate>>) -> Self {
-        self.set_mtls(certs, key, ca);
+    fn set_mtls(&mut self, identity: ClientIdentity, ca_pem: Option<Vec<u8>>);
+    fn with_mtls(mut self, identity: ClientIdentity, ca_pem: Option<Vec<u8>>) -> Self {
+        self.set_mtls(identity, ca_pem);
         self
     }
 
-    /// TLS session data used to resume a session.
-    fn set_tls_session(&mut self, tls_session: Option<TlsSession>);
-    fn with_tls_session(mut self, tls_session: Option<TlsSession>) -> Self {
-        self.set_tls_session(tls_session);
+    /// Replace the TLS backend (rustls by default). Takes effect on the next connection.
+    fn set_tls_connector(&mut self, connector: Arc<dyn TlsConnector>);
+    fn with_tls_connector(mut self, connector: Arc<dyn TlsConnector>) -> Self {
+        self.set_tls_connector(connector);
         self
     }
-    fn tls_session(&self) -> Option<&TlsSession>;
 
     fn fingerprint_mut(&mut self) -> &mut Fingerprint;
     fn set_fingerprint(&mut self, fingerprint: Fingerprint) {
-        #[repr(C)]
-        struct Item<'a> {
-            name: &'a str,
-            value: &'a str,
-        }
-        if let Some(finger) = fingerprint.adv.as_ref() {
-            let items = unsafe { slice::from_raw_parts(finger.hdr as *const Item, finger.hdr_count as usize) };
-            for item in items {
-                match (item.name, fingerprint.sec_full) {
-                    ("sec-ch-ua" |
-                    "sec-ch-ua-mobile" |
-                    "sec-ch-ua-platform" |
-                    "user-agent", _) => self.header_mut().insert(item.name, item.value),
-                    (_, true) => self.header_mut().insert(item.name, item.value),
-                    (_, false) => {}
-                }
-            }
-        }
         *self.fingerprint_mut() = fingerprint;
     }
     fn with_fingerprint(mut self, fingerprint: Fingerprint) -> Self {

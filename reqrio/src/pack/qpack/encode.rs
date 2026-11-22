@@ -2,7 +2,7 @@ use super::index::Index;
 use super::table::Table;
 use super::QPackType;
 use crate::pack::{huffman, PackItem};
-use reqtls::{BufferError, Writer};
+use reqo_base::{BufferError, Writer};
 
 pub struct QPackEncode {
     table: Table,
@@ -106,7 +106,7 @@ mod tests {
     use crate::pack::qpack::encode::QPackEncode;
     use crate::pack::qpack::index::Index;
     use crate::pack::qpack::QPackType;
-    use reqtls::Writer;
+    use reqo_base::Writer;
 
     #[test]
     fn test_qpack_encode1() {

@@ -1,8 +1,8 @@
 #![cfg(feature = "aync")]
 mod async_http;
 
-use reqrio::{AcReq, HttpStatus, Method, ReqExt, Timeout};
-use reqtls::ALPN;
+use reqo::{AcReq, HttpStatus, Method, ReqExt, Timeout};
+use reqo::ALPN;
 use std::time::Instant;
 
 

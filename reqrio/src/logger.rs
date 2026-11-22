@@ -29,7 +29,7 @@ impl Log for Logger {
                 return &metadata.level() <= l;
             }
         }
-        metadata.level() <= reqtls::max_level()
+        metadata.level() <= log::max_level()
     }
 
     fn log(&self, record: &Record) {
