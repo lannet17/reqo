@@ -110,8 +110,20 @@ pub trait TlsConnector: Send + Sync {
     }
 }
 
-/// Connector used when the session has none set: `RustlsConnector` with the `rustls` feature, otherwise an error.
+static DEFAULT: std::sync::RwLock<Option<Arc<dyn TlsConnector>>> = std::sync::RwLock::new(None);
+
+/// Set the connector for sessions that don't have one, including the ones
+/// created by `reqo::get` / `post` / `put`.
+pub fn set_default_connector(connector: Arc<dyn TlsConnector>) {
+    *DEFAULT.write().unwrap_or_else(|e| e.into_inner()) = Some(connector);
+}
+
+/// Connector for sessions that don't have one: the one passed to
+/// [`set_default_connector`], else `RustlsConnector` (`rustls` feature), else an error.
 pub fn default_connector() -> HlsResult<Arc<dyn TlsConnector>> {
+    if let Some(c) = DEFAULT.read().unwrap_or_else(|e| e.into_inner()).as_ref() {
+        return Ok(c.clone());
+    }
     #[cfg(feature = "rustls")]
     {
         use std::sync::OnceLock;

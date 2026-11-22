@@ -170,6 +170,7 @@ let s = Session::new()
 
 - 信任的根证书：`webpki-roots`，加上 `SSL_CERT_FILE` 里的证书，再加上 `RustlsConnector::with_extra_roots_pem` 添加的。
 - `with_verify(false)` 关闭证书校验。
+- `reqo::tls::set_default_connector` 设置没有指定连接器的会话所用的连接器，`reqo::get` 等函数也用它。
 
 要换别的 TLS 库，实现 `reqo::tls::TlsConnector`，并且不编译 rustls：
 

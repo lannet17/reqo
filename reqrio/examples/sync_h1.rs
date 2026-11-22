@@ -27,7 +27,7 @@ fn test_log() {
 fn main() {
     #[cfg(feature = "log")]
     test_log();
-    let t = Time::now();
+    let _t = Time::now();
     let mut req = Session::new()
         .with_alpn(ALPN::HTTP20)
         .with_verify(false)

@@ -174,6 +174,7 @@ let s = Session::new()
 
 - Trusted roots: `webpki-roots`, plus anything in `SSL_CERT_FILE`, plus `RustlsConnector::with_extra_roots_pem`.
 - `with_verify(false)` turns off certificate checks.
+- `reqo::tls::set_default_connector` sets the connector for sessions that have none, including `reqo::get` etc.
 
 To use a different TLS library, implement `reqo::tls::TlsConnector` and build
 without rustls:
