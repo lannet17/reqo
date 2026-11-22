@@ -1,5 +1,5 @@
-//! Content coding (gzip / deflate / zlib / brotli / zstd) in pure Rust
-//! (zstd uses the `zstd` crate, which compiles libzstd from source).
+//! gzip, deflate, zlib, brotli and zstd. zstd needs the `zstd` feature
+//! (the `zstd` crate, which builds libzstd).
 
 mod chunk;
 mod ext;
@@ -81,16 +81,16 @@ fn decompress(buf: &[u8], typ: CodeType) -> BaseResult<Buffer> {
 #[repr(u8)]
 pub enum CodeType {
     Gzip = 0,
-    /// Raw deflate (RFC 1951, no header) — also used by websocket permessage-deflate.
+    /// Raw deflate (RFC 1951). Used by WebSocket permessage-deflate.
     Deflate = 1,
     Brotli = 2,
-    /// zlib-wrapped deflate (RFC 1950) — what HTTP `Content-Encoding: deflate` means.
+    /// zlib (RFC 1950). This is what HTTP `Content-Encoding: deflate` uses.
     Zlib = 3,
     Zstd = 4,
     Null = 5,
 }
 
-/// Incremental gzip header/trailer handling around a raw inflater.
+// gzip header and trailer around a raw inflater
 struct GzipState {
     header: Vec<u8>,
     header_done: bool,
@@ -159,7 +159,7 @@ enum Inner {
     Enc(Encoder),
 }
 
-/// Streaming compressor / decompressor.
+/// Streaming encoder or decoder.
 pub struct TZCoder {
     typ: CodeType,
     inner: Inner,
@@ -211,8 +211,8 @@ impl TZCoder {
         Ok(TZCoder { typ, inner: Inner::Enc(enc) })
     }
 
-    /// Consume everything in `reader`, appending output to `out` (growing it as needed).
-    /// Returns `true` once the compressed stream has ended (decoders only).
+    /// Process all of `reader` and append the output to `out`, growing it if needed.
+    /// For decoders, returns `true` when the end of the compressed stream is reached.
     pub fn update(&mut self, reader: &mut Reader<'_>, out: &mut Writer) -> BaseResult<bool> {
         match &mut self.inner {
             Inner::Dec(dec) => Self::decode(dec, reader, out),
@@ -225,7 +225,7 @@ impl TZCoder {
         }
     }
 
-    /// Flush pending output. For encoders this finishes the stream.
+    /// Write remaining output. Ends the stream for encoders.
     pub fn finish(&mut self, out: &mut Writer) -> BaseResult<bool> {
         match &mut self.inner {
             Inner::Dec(dec) => Ok(match dec {

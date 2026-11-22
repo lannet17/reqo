@@ -231,7 +231,7 @@ impl Stream {
         }
     }
 
-    /// Negotiated ALPN of the TLS layer, if any.
+    /// ALPN negotiated by TLS; `None` for plain HTTP.
     pub fn alpn(&self) -> Option<&ALPN> {
         match self {
             Stream::SyncHttps(s) => Some(s.alpn()),

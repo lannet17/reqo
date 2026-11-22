@@ -1,5 +1,4 @@
-//! Byte buffers: [`Writer`] (fixed-capacity buffer with a filled window) and
-//! [`Reader`] (big-endian cursor). Storage is a plain `Vec<u8>`.
+//! [`Writer`] and [`Reader`].
 
 mod error;
 mod reader;
@@ -13,10 +12,8 @@ use std::ops::Range;
 #[allow(non_camel_case_types)]
 pub type u24 = u32;
 
-/// A fixed-capacity byte buffer with a filled window `start..end`.
-///
-/// * bytes in `start..end` are "filled" (written, not yet consumed)
-/// * bytes in `end..capacity` are "unfilled" (free space to write into)
+/// Byte buffer with fixed capacity. `start..end` holds written data that hasn't
+/// been consumed; `end..capacity` is free.
 pub struct Writer {
     buf: Vec<u8>,
     start: usize,
@@ -42,7 +39,7 @@ impl Writer {
         Writer { buf: vec![0; capacity], start: 0, end: 0 }
     }
 
-    /// Grow to at least `at_least` bytes (doubling), preserving contents and offsets.
+    /// Double the capacity until it is at least `at_least`. Contents are kept.
     pub fn resize(&mut self, at_least: usize) -> Result<(), BufferError> {
         let mut capacity = max(self.capacity() * 2, 1);
         while capacity < at_least { capacity *= 2; }
@@ -76,8 +73,7 @@ impl Writer {
 
     pub fn slice_mut(&mut self, range: Range<usize>) -> &mut [u8] { &mut self.buf[range] }
 
-    /// Mark `size` filled bytes as consumed. Returns `true` (and rewinds to 0)
-    /// once the buffer is empty.
+    /// Consume `size` bytes. When nothing is left, resets to 0 and returns `true`.
     pub fn used_empty(&mut self, size: usize) -> bool {
         self.start = (self.start + size).min(self.end);
         if self.start == self.end {
@@ -87,8 +83,8 @@ impl Writer {
         false
     }
 
-    /// Move bytes in `r` to `pos`. The filled window ends right after the moved
-    /// bytes; `start` follows the move when it lay inside the moved region.
+    /// Move the bytes in `r` to `pos`. `end` becomes the end of the moved bytes;
+    /// `start` moves with them if it was inside `r`.
     pub fn move_to(&mut self, r: Range<usize>, pos: usize) -> Result<(), BufferError> {
         if r.end < r.start || r.end > self.end() { return Err(BufferError::RangeEdgeError(r)); };
         let len = r.len();
@@ -167,7 +163,7 @@ impl Writer {
         Ok(())
     }
 
-    /// Writes at `place` without changing the filled window.
+    /// Write at `place`. `start` and `end` don't change.
     pub fn write_slice_in(&mut self, place: usize, v: &[u8]) -> Result<usize, BufferError> {
         self.ensure(place, v.len())?;
         self.buf[place..place + v.len()].copy_from_slice(v);
@@ -184,8 +180,7 @@ impl Writer {
 
     pub fn write_u64(&mut self, v: u64) -> Result<(), BufferError> { self.write_slice(&v.to_be_bytes()) }
 
-    /// Writes the native-endian bytes of `v` (kept for API compatibility:
-    /// `write_u16(v) == write_u16_be(v.to_be())`).
+    /// `write_u16_be(v.to_be())` is the same as `write_u16(v)`.
     pub fn write_u16_be(&mut self, v: u16) -> Result<(), BufferError> { self.write_u16(u16::from_be(v)) }
 
     pub fn write_u24_be(&mut self, v: u24) -> Result<(), BufferError> { self.write_u24(u32::from_be(v)) }
@@ -222,7 +217,7 @@ impl Writer {
     }
 }
 
-/// Writing in front of `start` (the caller reserved head room with `reset_offset`).
+/// Write before `start` (leave room first with `reset_offset`).
 impl Writer {
     pub fn write_u8_front(&mut self, v: u8) -> usize {
         self.start -= 1;
@@ -269,7 +264,7 @@ impl Debug for Writer {
     }
 }
 
-/// Borrowed-or-owned bytes.
+/// Borrowed or owned bytes.
 #[derive(Clone)]
 pub enum Buf<'a> {
     Ref {

@@ -25,7 +25,7 @@ pub const CHUNK_END: [u8; 7] = [13, 10, 48, 13, 10, 13, 10];
 
 #[cfg(feature = "aync")]
 pub mod aio {
-    //! Asynchronous (tokio) API. Same methods as [`crate::Session`], awaited:
+    //! Async session (tokio). Same methods as [`crate::Session`], with `.await`:
     //!
     //! ```rust,ignore
     //! use reqo::aio::Session;
@@ -56,13 +56,13 @@ pub use stream::{Proxy, ProxyStream, ConnParam, WebSocket, TlsStream, Stream, St
 pub use stream::AsyncTlsStream;
 pub use tls::{ClientIdentity, TlsConnector, TlsVersion};
 
-// `aync` always pulls in tokio-rustls (Cargo can't express "aync AND rustls");
-// it is only used together with the `rustls` feature.
+// `aync` enables tokio-rustls even without `rustls` (Cargo has no "both
+// features" dependency); it is only used when `rustls` is on.
 #[cfg(all(feature = "aync", not(feature = "rustls")))]
 use tokio_rustls as _;
 
 #[cfg(feature = "quic")]
-compile_error!("the `quic` feature is not supported yet with the pluggable TLS layer");
+compile_error!("the `quic` feature (HTTP/3) does not work yet");
 #[cfg(feature = "quic")]
 pub use stream::QUICStream;
 pub use time::{Time, TimeError, Timeout};
@@ -72,26 +72,17 @@ pub use tokio;
 pub use logger::Logger;
 use crate::ext::ReqUrl;
 
-/// Send a GET request with a temporary session.
-///
-/// * `url` - request URL or URL-like value.
-/// * `body` - request body payload.
+/// GET using a new [`Session`] that is dropped afterwards.
 pub fn get<'a>(url: impl Into<ReqUrl<'a>>, body: impl Into<Body<'a>>) -> HlsResult<Response> {
     Session::new().get(url, body)
 }
 
-/// Send a POST request with a temporary session.
-///
-/// * `url` - request URL or URL-like value.
-/// * `body` - request body payload.
+/// POST using a new [`Session`] that is dropped afterwards.
 pub fn post<'a>(url: impl Into<ReqUrl<'a>>, body: impl Into<Body<'a>>) -> HlsResult<Response> {
     Session::new().post(url, body)
 }
 
-/// Send a PUT request with a temporary session.
-///
-/// * `url` - request URL or URL-like value.
-/// * `body` - request body payload.
+/// PUT using a new [`Session`] that is dropped afterwards.
 pub fn put<'a>(url: impl Into<ReqUrl<'a>>, body: impl Into<Body<'a>>) -> HlsResult<Response> {
     Session::new().put(url, body)
 }

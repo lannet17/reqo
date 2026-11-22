@@ -55,7 +55,7 @@ impl Header {
                 HeaderItem::new_reserved("sec-ch-ua-arch", HeaderValue::new_str("")),
                 HeaderItem::new_reserved("sec-ch-ua-platform", HeaderValue::new_str("")),
                 HeaderItem::new_reserved("upgrade-insecure-requests", HeaderValue::new_str("")),
-                HeaderItem::new_reserved("user-agent", HeaderValue::String(Cow::Owned(format!("reqrio/{}", env!("CARGO_PKG_VERSION"))))),
+                HeaderItem::new_reserved("user-agent", HeaderValue::String(Cow::Owned(format!("reqo/{}", env!("CARGO_PKG_VERSION"))))),
                 HeaderItem::new_reserved("sec-ch-ua", HeaderValue::new_str("")),
                 HeaderItem::new_reserved("sec-ch-ua-wow64", HeaderValue::new_str("")),
                 HeaderItem::new_reserved("sec-ch-ua-mobile", HeaderValue::new_str("")),
@@ -110,7 +110,7 @@ impl Header {
                 HeaderItem::new_reserved("sec-ch-prefers-color-scheme", HeaderValue::new_str("")),
                 HeaderItem::new_reserved("upgrade-insecure-requests", HeaderValue::new_str("")),
                 HeaderItem::new_reserved("content-type", HeaderValue::new_str("")),
-                HeaderItem::new_reserved("user-agent", HeaderValue::String(Cow::Owned(format!("reqrio/{}", env!("CARGO_PKG_VERSION"))))),
+                HeaderItem::new_reserved("user-agent", HeaderValue::String(Cow::Owned(format!("reqo/{}", env!("CARGO_PKG_VERSION"))))),
                 HeaderItem::new_reserved("accept", HeaderValue::new_str("text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")),
                 HeaderItem::new_reserved("origin", HeaderValue::new_str("")),
                 HeaderItem::new_reserved("sec-fetch-site", HeaderValue::new_str("")),
@@ -144,7 +144,7 @@ impl Header {
                 HeaderItem::new_reserved("sec-ch-ua-mobile", HeaderValue::new_str("")),
                 HeaderItem::new_reserved("sec-ch-ua-platform", HeaderValue::new_str("")),
                 HeaderItem::new_reserved("Upgrade-Insecure-Requests", HeaderValue::new_str("")),
-                HeaderItem::new_reserved("User-Agent", HeaderValue::String(Cow::Owned(format!("reqrio/{}", env!("CARGO_PKG_VERSION"))))),
+                HeaderItem::new_reserved("User-Agent", HeaderValue::String(Cow::Owned(format!("reqo/{}", env!("CARGO_PKG_VERSION"))))),
                 HeaderItem::new_reserved("Accept", HeaderValue::new_str("text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")),
                 HeaderItem::new_reserved("Sec-Fetch-Site", HeaderValue::new_str("")),
                 HeaderItem::new_reserved("Sec-Fetch-Mode", HeaderValue::new_str("")),
@@ -430,8 +430,7 @@ impl Header {
         }
     }
 
-    /// Insert every item of `other` (e.g. built with [`header!`](crate::header!)) into `self`,
-    /// replacing existing values with the same name.
+    /// Insert all items of `other`, replacing items with the same name.
     pub fn merge(&mut self, other: Header) {
         for item in other.inner {
             let (name, value) = item.into_parts();

@@ -107,8 +107,8 @@ impl HTTP1Stream {
         } else { Ok(vec![]) }
     }
 
-    /// With pipelining, the previous read may already hold (part of) the next
-    /// response: parse what is buffered before blocking on the socket again.
+    // With pipelining the buffer can already hold the next response, so parse
+    // it before reading the socket again.
     fn recv_buffered(&mut self, responses: &mut HashMap<u64, StreamMessage>) -> HlsResult<Vec<u64>> {
         if self.read_buffer.is_empty() || !responses.contains_key(&self.recv_sid) { return Ok(vec![]); }
         self.recv(responses)

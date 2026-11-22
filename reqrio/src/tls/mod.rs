@@ -1,12 +1,11 @@
-//! TLS backends.
+//! TLS connectors.
 //!
-//! A session connects TCP (and the proxy, if set), then calls
-//! [`TlsConnector::connect`] / `connect_async` with that stream and gets back a
-//! [`TlsIo`] / `AsyncTlsIo`. The negotiated ALPN decides between HTTP/1.1 and HTTP/2.
+//! After TCP (and the proxy, if any) is set up, the session passes the stream to
+//! [`TlsConnector::connect`] (or `connect_async`). If the returned stream reports
+//! `h2` as ALPN the session uses HTTP/2, otherwise HTTP/1.1.
 //!
-//! The `rustls` feature provides `RustlsConnector`, which is used when no
-//! connector is set. Set another one with
-//! [`ReqExt::set_tls_connector`](crate::ReqExt::set_tls_connector).
+//! Without a connector set, `RustlsConnector` is used (`rustls` feature).
+//! Change it with [`ReqExt::set_tls_connector`](crate::ReqExt::set_tls_connector).
 
 #[cfg(feature = "rustls")]
 mod rustls_backend;
@@ -22,7 +21,7 @@ use std::{future::Future, pin::Pin};
 #[cfg(feature = "aync")]
 use tokio::io::{AsyncRead, AsyncWrite};
 
-/// Highest TLS version the client should offer.
+/// Highest TLS version to offer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum TlsVersion {
     Tls12,
@@ -30,7 +29,7 @@ pub enum TlsVersion {
     Tls13,
 }
 
-/// Client certificate chain + private key for mutual TLS, PEM encoded.
+/// Client certificate chain and private key (PEM) for mTLS.
 #[derive(Clone)]
 pub struct ClientIdentity {
     pub cert_chain_pem: Vec<u8>,
@@ -53,34 +52,34 @@ impl std::fmt::Debug for ClientIdentity {
     }
 }
 
-/// Backend-agnostic parameters for one client handshake.
+/// Settings for one handshake, taken from the session.
 #[derive(Debug, Clone)]
 pub struct TlsOptions<'a> {
-    /// SNI / certificate name.
+    /// SNI, and the name the certificate is checked against.
     pub server_name: &'a str,
-    /// ALPN protocols to offer, most preferred first.
+    /// Protocols to offer, in order of preference.
     pub alpn: &'a [ALPN],
-    /// Verify the server certificate chain and hostname.
+    /// Check the certificate chain and host name.
     pub verify: bool,
     pub max_version: TlsVersion,
     pub identity: Option<&'a ClientIdentity>,
-    /// Extra trusted roots (PEM). When set, *only* these roots are trusted.
+    /// CA certificates (PEM). If set, only these are trusted.
     pub ca_pem: Option<&'a [u8]>,
-    /// Path to append NSS key-log lines to (debugging only).
+    /// File to append NSS key-log lines to.
     pub key_log: Option<&'a str>,
-    /// Request Encrypted Client Hello where the backend supports it.
+    /// Use ECH if the connector supports it.
     pub ech: bool,
 }
 
-/// Plain (possibly proxied) transport handed to a backend for synchronous use.
+/// The TCP stream (after the proxy, if any) given to [`TlsConnector::connect`].
 pub trait SyncIo: Read + Write + Send + Sync {}
 impl<T: Read + Write + Send + Sync> SyncIo for T {}
 
-/// An established synchronous TLS stream.
+/// Stream returned by [`TlsConnector::connect`].
 pub trait TlsIo: Read + Write + Send + Sync {
-    /// The negotiated ALPN protocol, or [`ALPN::nullptr`] if none was negotiated.
+    /// Negotiated ALPN; [`ALPN::nullptr`] if none.
     fn alpn(&self) -> ALPN;
-    /// Send close_notify and flush.
+    /// Send close_notify.
     fn shutdown(&mut self) -> io::Result<()>;
 }
 
@@ -89,7 +88,7 @@ pub trait AsyncIo: AsyncRead + AsyncWrite + Unpin + Send + Sync {}
 #[cfg(feature = "aync")]
 impl<T: AsyncRead + AsyncWrite + Unpin + Send + Sync> AsyncIo for T {}
 
-/// An established asynchronous TLS stream. `poll_shutdown` should send close_notify.
+/// Stream returned by `connect_async`. `poll_shutdown` should send close_notify.
 #[cfg(feature = "aync")]
 pub trait AsyncTlsIo: AsyncRead + AsyncWrite + Unpin + Send + Sync {
     fn alpn(&self) -> ALPN;
@@ -98,12 +97,12 @@ pub trait AsyncTlsIo: AsyncRead + AsyncWrite + Unpin + Send + Sync {
 #[cfg(feature = "aync")]
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
-/// A TLS client implementation.
+/// Does the TLS handshake for a session.
 pub trait TlsConnector: Send + Sync {
-    /// Perform a blocking handshake over `io`.
+    /// Handshake on `io` and return the encrypted stream.
     fn connect(&self, io: Box<dyn SyncIo>, opts: &TlsOptions<'_>) -> HlsResult<Box<dyn TlsIo>>;
 
-    /// Perform a non-blocking handshake over `io`.
+    /// Async version of [`connect`](Self::connect). The default returns an error.
     #[cfg(feature = "aync")]
     fn connect_async<'a>(&'a self, io: Box<dyn AsyncIo>, opts: TlsOptions<'a>) -> BoxFuture<'a, HlsResult<Box<dyn AsyncTlsIo>>> {
         let _ = (io, opts);
@@ -111,7 +110,7 @@ pub trait TlsConnector: Send + Sync {
     }
 }
 
-/// The connector used when none was set explicitly.
+/// Connector used when the session has none set: `RustlsConnector` with the `rustls` feature, otherwise an error.
 pub fn default_connector() -> HlsResult<Arc<dyn TlsConnector>> {
     #[cfg(feature = "rustls")]
     {
@@ -123,14 +122,14 @@ pub fn default_connector() -> HlsResult<Arc<dyn TlsConnector>> {
     Err("no TLS backend: enable the `rustls` feature or call `set_tls_connector`".into())
 }
 
-/// ALPN list to offer for a preferred protocol.
+/// `h2` → `[h2, http/1.1]`, anything else → `[http/1.1]`.
 pub(crate) fn alpn_offer(preferred: &ALPN) -> &'static [ALPN] {
     const H2: &[ALPN] = &[ALPN::HTTP20, ALPN::HTTP11];
     const H1: &[ALPN] = &[ALPN::HTTP11];
     if *preferred == ALPN::HTTP20 { H2 } else { H1 }
 }
 
-/// Per-session TLS settings (shared by `Session` / `aio::Session`).
+/// TLS settings stored in a session.
 #[derive(Clone)]
 pub(crate) struct TlsSettings {
     pub(crate) verify: bool,

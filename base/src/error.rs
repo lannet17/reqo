@@ -3,7 +3,7 @@ use std::fmt::{Display, Formatter};
 
 pub type BaseResult<T> = Result<T, BaseError>;
 
-/// Errors produced by reqo-base (buffers, URL parsing, content coding).
+/// Error type of reqo-base.
 #[derive(Debug)]
 pub enum BaseError {
     Buffer(BufferError),

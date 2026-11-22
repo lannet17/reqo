@@ -24,7 +24,7 @@ pub trait ReqExt: Sized {
         self
     }
 
-    /// Whether to verify server-provided messages (certificates, signatures, etc.); enabled by default.
+    /// Check the server certificate. On by default.
     fn set_verify(&mut self, verify: bool);
     fn with_verify(mut self, verify: bool) -> Self {
         self.set_verify(verify);
@@ -32,7 +32,7 @@ pub trait ReqExt: Sized {
     }
     fn proxy(&self) -> &Proxy;
 
-    /// Whether to automatically follow redirects.
+    /// Follow 3xx redirects. On by default.
     fn set_auto_redirect(&mut self, auto_redirect: bool);
     fn with_auto_redirect(mut self, auto_redirect: bool) -> Self {
         self.set_auto_redirect(auto_redirect);
@@ -44,15 +44,15 @@ pub trait ReqExt: Sized {
         self
     }
 
-    /// Export a TLS key log.
-    /// Note: do not enable this in production as it can expose sensitive traffic data.
+    /// Write TLS secrets to `path` (NSS key-log format, e.g. for Wireshark).
+    /// Anyone with the file can decrypt the traffic.
     fn set_key_log(&mut self, path: impl Into<String>);
 
     fn with_key_log(mut self, path: impl Into<String>) -> Self {
         self.set_key_log(path);
         self
     }
-    /// Accept `SSLKEYLOGFILE`.
+    /// [`with_key_log`](Self::with_key_log) with the path in `SSLKEYLOGFILE`, if set.
     fn with_env_key_log(mut self) -> Self {
         if let Ok(key_log) = std::env::var("SSLKEYLOGFILE") {
             self.set_key_log(key_log);
@@ -60,24 +60,22 @@ pub trait ReqExt: Sized {
         self
     }
 
-    /// * Must be set before establishing the TLS connection; otherwise call `re_conn`.
-    /// * HTTP/2.0 is used by default; the actual protocol is negotiated with the server.
+    /// `ALPN::HTTP20` (default) offers h2 and http/1.1; `ALPN::HTTP11` offers only
+    /// http/1.1. Applies to the next connection (see `re_conn`).
     fn set_alpn(&mut self, alpn: ALPN);
     fn with_alpn(mut self, alpn: ALPN) -> Self {
         self.set_alpn(alpn);
         self
     }
 
-    /// * Must be set before establishing the TLS connection; otherwise call `re_conn`.
-    /// * TLS 1.3 is offered by default; the actual version is negotiated with the server.
+    /// Highest TLS version to offer (default 1.3). Applies to the next connection.
     fn set_version(&mut self, version: TlsVersion);
     fn with_version(mut self, version: TlsVersion) -> Self {
         self.set_version(version);
         self
     }
 
-    /// Enable mTLS with a PEM client certificate chain + key, and optionally
-    /// restrict trusted roots to the given PEM CA bundle.
+    /// Client certificate for mTLS. If `ca_pem` is given, only those CAs are trusted.
     ///```no_run
     /// use reqo::*;
     /// use reqo::tls::ClientIdentity;
@@ -92,7 +90,7 @@ pub trait ReqExt: Sized {
         self
     }
 
-    /// Replace the TLS backend (rustls by default). Takes effect on the next connection.
+    /// TLS connector to use from the next connection on (default: rustls).
     fn set_tls_connector(&mut self, connector: Arc<dyn TlsConnector>);
     fn with_tls_connector(mut self, connector: Arc<dyn TlsConnector>) -> Self {
         self.set_tls_connector(connector);
@@ -116,7 +114,7 @@ pub trait ReqExt: Sized {
         *header = headers;
     }
 
-    /// Merge headers (e.g. from [`header!`](crate::header!)) into the session headers.
+    /// Add `headers` to the session headers, replacing ones with the same name.
     fn merge_headers(&mut self, headers: Header) {
         ReqExt::header_mut(self).merge(headers)
     }
@@ -140,7 +138,8 @@ pub trait ReqExt: Sized {
     }
 
 
-    /// Set request headers. When `keep_sort` is `true`, the headers must include required fields such as `Host` and `Content-Length`.
+    /// Set the header order explicitly. With `keep_sort`, the list must include
+    /// `Host`, `Content-Length` and the other headers reqo would normally add.
     fn with_headers_keys(mut self, headers: Vec<HeaderItem>, keep_sort: bool) -> HlsResult<Self> {
         self.set_header_keys(headers, keep_sort)?;
         Ok(self)
@@ -194,7 +193,7 @@ pub trait ReqStreamExt: ReqExt {
 }
 
 pub trait UrlExt {
-    /// Append query parameters: `"https://x/api".params([("q", "rust"), ("page", "2")])`.
+    /// Parse the URL and add query parameters: `"https://x/api".params([("q", "rust")])`.
     fn params<K: ToString, V: ToString>(&self, params: impl IntoIterator<Item = (K, V)>) -> Result<Url, UrlError>;
     fn sni(&self, sni: impl Into<String>) -> Result<Url, UrlError>;
 }

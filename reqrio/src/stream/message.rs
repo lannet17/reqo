@@ -101,8 +101,8 @@ impl StreamMessage {
                 Ok((self.remain == 0, read_len))
             }
             Some(ref mut coder) => {
-                // `buf` may already contain the next pipelined response: never
-                // feed the decoder more than what is left of this body.
+                // `buf` can contain the next pipelined response; only decode
+                // what is left of this body.
                 let limit = min(buf.len(), self.remain);
                 let mut reader = Reader::from_slice(&buf[..limit]);
                 let finish = coder.decompress(&mut reader, &mut self.body)?;

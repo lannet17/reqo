@@ -1,4 +1,4 @@
-//! Thin wrappers around a backend's TLS stream (see [`crate::tls`]).
+//! TLS streams returned by a [`TlsConnector`](crate::tls::TlsConnector).
 
 use crate::tls::TlsIo;
 #[cfg(feature = "aync")]
@@ -13,7 +13,7 @@ use std::task::{Context, Poll};
 #[cfg(feature = "aync")]
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
-/// Synchronous TLS stream produced by a [`TlsConnector`](crate::tls::TlsConnector).
+/// TLS stream of a sync session.
 pub struct TlsStream {
     inner: Box<dyn TlsIo>,
     alpn: ALPN,
@@ -46,7 +46,7 @@ impl Write for TlsStream {
     fn flush(&mut self) -> io::Result<()> { self.inner.flush() }
 }
 
-/// Asynchronous TLS stream produced by a [`TlsConnector`](crate::tls::TlsConnector).
+/// TLS stream of an async session.
 #[cfg(feature = "aync")]
 pub struct AsyncTlsStream {
     inner: Box<dyn AsyncTlsIo>,

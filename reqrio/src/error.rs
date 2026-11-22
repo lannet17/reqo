@@ -31,7 +31,7 @@ pub enum HlsError {
     UnsupportedAlpn(ALPN),
     Body(FormError),
     Base(BaseError),
-    /// Error reported by the TLS backend.
+    /// Error from the TLS connector.
     Tls(String),
     HPack(PackError),
     Time(TimeError),

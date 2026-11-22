@@ -7,7 +7,7 @@ use std::str::FromStr;
 use std::sync::{Arc, LazyLock, RwLock};
 use std::time::SystemTime;
 
-/// Resolved addresses for a host, with the time they were resolved.
+/// Addresses of a host and when they were looked up.
 #[derive(Debug, Clone, Default)]
 pub struct DNSCache {
     addrs: Vec<IpAddr>,
@@ -76,7 +76,7 @@ impl Addr {
         let mut cache = match IpAddr::from_str(&self.host) {
             Ok(addr) => DNSCache::new_addrs(vec![addr]),
             Err(_) => {
-                // `ech` (DNS HTTPS-record lookup) is left to TLS backends that support it.
+                // no HTTPS-record (ECH) lookup here
                 let _ = ech;
                 let addrs = format!("{}:{}", self.host, self.port).to_socket_addrs()?.map(|x| x.ip()).collect();
                 DNSCache::new_addrs(addrs)

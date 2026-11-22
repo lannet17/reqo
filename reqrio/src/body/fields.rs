@@ -1,19 +1,16 @@
-//! Key/value fields produced by [`body!`](crate::body!), serialized either as a
-//! JSON object (default) or as `application/x-www-form-urlencoded` (`.form()`).
-//!
-//! There is deliberately no JSON value type here: each value is turned into its
-//! JSON text when the macro is evaluated, via [`ToJson`].
+//! Fields built by [`body!`](crate::body!). Each value is converted to JSON
+//! text (through [`ToJson`]) when the macro runs.
 
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::Write;
 
-/// One top-level `key: value` entry of a body.
+/// One `key: value` of a [`body!`](crate::body!).
 #[derive(Debug, Clone)]
 pub struct Field {
     pub(crate) key: String,
     /// JSON text of the value.
     pub(crate) json: String,
-    /// The raw string when the value is a string (used unquoted in forms / multipart).
+    /// The string itself if the value is a string.
     pub(crate) plain: Option<String>,
 }
 
@@ -29,13 +26,13 @@ impl Field {
     /// JSON text of the value.
     pub fn json(&self) -> &str { &self.json }
 
-    /// Value as used in form / multipart encodings: strings unquoted, everything else as JSON.
+    /// Value used in forms: a string as is, anything else as JSON text.
     pub fn form_value(&self) -> &str {
         self.plain.as_deref().unwrap_or(&self.json)
     }
 }
 
-/// Fields serialized as a JSON object.
+/// `{"k":v,...}`
 pub(crate) fn object_json(fields: &[Field]) -> String {
     let mut out = String::with_capacity(fields.iter().map(|f| f.key.len() + f.json.len() + 4).sum::<usize>() + 2);
     out.push('{');
@@ -67,12 +64,15 @@ pub(crate) fn write_json_str(s: &str, out: &mut String) {
     out.push('"');
 }
 
-/// Values usable inside [`body!`](crate::body!): std scalars, strings, `Option`,
-/// sequences and string-keyed maps (and `serde_json::Value` with the `serde` feature).
+/// Conversion to JSON text, for values in [`body!`](crate::body!).
+///
+/// Implemented for numbers, `bool`, `char`, strings, `Option`, slices, arrays,
+/// `Vec`, `HashMap` / `BTreeMap` with string keys, and `serde_json::Value`
+/// (`serde` feature). `None` and non-finite floats become `null`.
 pub trait ToJson {
     fn write_json(&self, out: &mut String);
 
-    /// `Some` for string values.
+    /// The string, if the value is one.
     fn as_plain(&self) -> Option<&str> { None }
 
     fn to_json(&self) -> String {
@@ -115,7 +115,7 @@ impl ToJson for bool {
     fn write_json(&self, out: &mut String) { out.push_str(if *self { "true" } else { "false" }) }
 }
 
-/// `()` serializes as `null` (the `null` keyword in `body!` maps to it).
+/// `null`. `body!` uses it for the `null` keyword.
 impl ToJson for () {
     fn write_json(&self, out: &mut String) { out.push_str("null") }
 }
@@ -196,7 +196,7 @@ impl ToJson for serde_json::Value {
     fn as_plain(&self) -> Option<&str> { self.as_str() }
 }
 
-/// Already-serialized JSON (nested `{}` / `[]` inside `body!`).
+/// JSON text written as is (nested `{}` / `[]` in `body!`).
 #[doc(hidden)]
 pub struct RawJson(pub String);
 
@@ -204,7 +204,7 @@ impl ToJson for RawJson {
     fn write_json(&self, out: &mut String) { out.push_str(&self.0) }
 }
 
-/// Support code for the exported macros. Not public API.
+/// Used by the macros. Not part of the API.
 #[doc(hidden)]
 pub mod __private {
     pub use super::{Field, RawJson, ToJson};

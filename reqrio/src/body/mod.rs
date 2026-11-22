@@ -20,7 +20,7 @@ use std::borrow::Cow;
 use std::sync::Arc;
 
 pub enum BodyKind<'a> {
-    /// Fields from `body!` / `Body::json`; JSON or urlencoded depending on the content type.
+    /// Sent as a form if the content type is urlencoded, otherwise as JSON.
     Fields(HCow<'a, Vec<Field>>),
     Bytes(Cow<'a, [u8]>),
     Files(HCow<'a, HttpFile>),
@@ -36,7 +36,7 @@ impl<'a, 'b: 'a> From<&'b BodyKind<'a>> for BodyKind<'a> {
     }
 }
 
-/// HTTP request body payload for raw bytes, JSON, forms, or file uploads.
+/// Request body: bytes, text, fields (JSON or form) or multipart.
 pub struct Body<'a> {
     kind: BodyKind<'a>,
     ct: ContentType,
@@ -146,12 +146,12 @@ impl<'a> Body<'a> {
         }
     }
 
-    /// Body from `key: value` fields, sent as JSON. Usually built with [`body!`](crate::body!).
+    /// JSON body from fields. [`body!`](crate::body!) calls this.
     pub fn from_fields(fields: Vec<Field>) -> Body<'a> {
         Body { kind: BodyKind::Fields(HCow::Owned(fields)), ct: ContentType::json() }
     }
 
-    /// The `key: value` fields, if this body was built from fields.
+    /// The fields, if the body has them.
     pub fn fields(&self) -> Option<&[Field]> {
         match &self.kind {
             BodyKind::Fields(f) => Some(f.as_slice()),
@@ -159,15 +159,15 @@ impl<'a> Body<'a> {
         }
     }
 
-    /// Send the same fields as `application/x-www-form-urlencoded`
-    /// (string values unquoted, other values as their JSON text).
+    /// Send as `application/x-www-form-urlencoded`: `k=v&...`, where a string
+    /// value is used as is and anything else as JSON text.
     pub fn form(mut self) -> Body<'a> {
         self.ct = ContentType::form();
         self
     }
 
     #[cfg(feature = "serde")]
-    /// JSON body from any `Serialize` value. A struct / map can be turned into a form with `.form()`.
+    /// JSON body from a `Serialize` value. If it serializes to an object, `.form()` works too.
     pub fn json<T: Serialize + ?Sized>(value: &T) -> HlsResult<Body<'a>> {
         let value = serde_json::to_value(value).map_err(|e| format!("struct to json error, {}", e))?;
         Ok(match value {
@@ -202,7 +202,7 @@ impl<'a> Body<'a> {
         }
     }
 
-    /// Serialize the body to raw bytes.
+    /// Body as it is sent.
     pub fn to_vec(&self) -> HlsResult<Vec<u8>> {
         let mut body = self.as_reader()?;
         let mut writer = Writer::with_capacity(body.len());
@@ -211,13 +211,13 @@ impl<'a> Body<'a> {
         Ok(writer.filled().to_vec())
     }
 
-    /// Serialize the body to UTF-8 text.
+    /// Body as it is sent, as a string.
     pub fn to_string(&self) -> HlsResult<String> {
         let res = self.to_vec()?;
         Ok(String::from_utf8(res)?)
     }
 
-    /// Return the body content type.
+    /// Content type.
     pub fn context_type(&self) -> &ContentType { &self.ct }
 
     pub fn with_ct(mut self, ct: impl Into<ContentType>) -> Body<'a> {

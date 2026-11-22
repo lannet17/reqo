@@ -66,7 +66,7 @@ pub async fn http_get_matrix(req: &mut Session, alpn: ALPN) {
 
     // /user-agent
     let ua = req.recv(sids.next().unwrap()).await.unwrap().json::<Value>().unwrap();
-    assert!(ua["user-agent"].dump().to_lowercase().contains("reqrio"));
+    assert!(ua["user-agent"].dump().to_lowercase().contains("reqo/"));
 
     // /ip
     let ip = req.recv(sids.next().unwrap()).await.unwrap().json::<Value>().unwrap();
@@ -361,7 +361,7 @@ pub async fn http_cookie(req: &mut Session) {
 /// Request Header Test
 pub async fn http_header(req: &mut Session) {
     req.merge_headers(header! {
-        "User-Agent": format!("reqrio/{},reqrio-test",env!("CARGO_PKG_VERSION")),
+        "User-Agent": format!("reqo/{},reqo-test",env!("CARGO_PKG_VERSION")),
         "X-Reqrio-Test": "hello",
         "Accept-Language": "zh-CN,zh;q=0.9",
         "X-Multi": "a",
@@ -387,7 +387,7 @@ pub async fn http_header(req: &mut Session) {
     let mut h1 = req.recv(sids.next().unwrap()).await.unwrap().text().unwrap();
     h1.make_ascii_lowercase();
     let header = serde_json::from_str::<Value>(h1.as_str()).unwrap()["headers"].take();
-    assert_eq!(header["user-agent"].dump(), format!("reqrio/{},reqrio-test", env!("CARGO_PKG_VERSION")));
+    assert_eq!(header["user-agent"].dump(), format!("reqo/{},reqo-test", env!("CARGO_PKG_VERSION")));
     assert_eq!(header["x-reqrio-test"].dump(), "hello");
     assert_eq!(header["accept-language"].dump(), "zh-cn,zh;q=0.9");
     assert_eq!(header["x-multi"].dump(), "a");
@@ -398,7 +398,7 @@ pub async fn http_header(req: &mut Session) {
 
 
     let h2 = req.recv(sids.next().unwrap()).await.unwrap().json::<Value>().unwrap();
-    assert_eq!(h2["user-agent"].dump(), format!("reqrio/{},reqrio-test", env!("CARGO_PKG_VERSION")));
+    assert_eq!(h2["user-agent"].dump(), format!("reqo/{},reqo-test", env!("CARGO_PKG_VERSION")));
 
     let h3 = req.recv(sids.next().unwrap()).await.unwrap().json::<Value>().unwrap();
     assert_eq!(h3["data"].dump(), r#"{"with":"header"}"#);
@@ -408,7 +408,7 @@ pub async fn http_header(req: &mut Session) {
         let mut res = req.recv(sids.next().unwrap()).await.unwrap().text().unwrap();
         res.make_ascii_lowercase();
         let header = serde_json::from_str::<Value>(res.as_str()).unwrap()["headers"].take();
-        assert_eq!(header["user-agent"].dump(), format!("reqrio/{},reqrio-test", env!("CARGO_PKG_VERSION")));
+        assert_eq!(header["user-agent"].dump(), format!("reqo/{},reqo-test", env!("CARGO_PKG_VERSION")));
         assert_eq!(header["x-reqrio-test"].dump(), "overwritten");
         assert_eq!(header["accept-language"].dump(), "zh-cn,zh;q=0.9");
         assert_eq!(header["x-multi"].dump(), "a");

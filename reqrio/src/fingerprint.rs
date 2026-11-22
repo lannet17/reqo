@@ -1,13 +1,11 @@
-//! HTTP/2 and HTTP/3 connection-level fingerprint (SETTINGS frames, priority).
-//!
-//! TLS ClientHello fingerprinting is no longer part of reqrio itself: it is a
-//! property of the TLS backend (see [`crate::tls::TlsConnector`]).
+//! HTTP/2 (and HTTP/3) SETTINGS frames and stream priority. The TLS ClientHello
+//! is up to the [`TlsConnector`](crate::tls::TlsConnector).
 
 use crate::*;
 
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub struct H2Finger {
-    /// Frames sent right after the connection preface (SETTINGS, WINDOW_UPDATE, ...).
+    /// Frames sent after the connection preface.
     pub frames: Vec<H2Frame<'static>>,
     pub weight: u8,
     pub priority: bool,
@@ -96,7 +94,7 @@ impl Default for H3Finger {
 }
 
 
-/// HTTP-level fingerprint: HTTP/2 (and HTTP/3) connection settings.
+/// HTTP/2 (and HTTP/3) settings used by a session.
 #[cfg_attr(debug_assertions, derive(Debug))]
 #[derive(Default)]
 pub struct Fingerprint {

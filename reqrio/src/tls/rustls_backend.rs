@@ -1,4 +1,4 @@
-//! Default TLS backend built on rustls (ring crypto provider, webpki roots).
+//! rustls connector (ring, webpki-roots).
 
 use super::{SyncIo, TlsConnector, TlsIo, TlsOptions, TlsVersion};
 use crate::error::{HlsError, HlsResult};
@@ -16,12 +16,15 @@ use std::sync::{Arc, Mutex};
 #[cfg(feature = "aync")]
 use super::{AsyncIo, AsyncTlsIo, BoxFuture};
 
-/// rustls-based [`TlsConnector`].
+/// [`TlsConnector`] using rustls.
 ///
-/// * Trusts the Mozilla root set (`webpki-roots`), plus any certificates in the
-///   PEM file named by `SSL_CERT_FILE` and those added with [`with_extra_roots_pem`](Self::with_extra_roots_pem).
-/// * `ClientConfig`s are cached per option set so rustls' built-in session
-///   resumption (tickets / session ids) works across connections.
+/// Trusted roots are `webpki-roots`, the certificates in `SSL_CERT_FILE` (read
+/// once, in [`new`](Self::new)) and any added with
+/// [`with_extra_roots_pem`](Self::with_extra_roots_pem).
+///
+/// The rustls config is kept per (verify, version, ALPN), so later connections
+/// can resume the TLS session. Configs with mTLS, a CA bundle or a key log are
+/// built for each connection.
 pub struct RustlsConnector {
     provider: Arc<CryptoProvider>,
     custom: Option<Arc<ClientConfig>>,
@@ -60,8 +63,8 @@ impl RustlsConnector {
         }
     }
 
-    /// Trust the certificates in `pem` in addition to the default roots.
-    /// An intermediate works too, which helps with servers that send an incomplete chain.
+    /// Also trust the certificates in `pem`. Adding an intermediate certificate
+    /// works for servers that don't send their full chain.
     pub fn with_extra_roots_pem(mut self, pem: &[u8]) -> HlsResult<Self> {
         for cert in CertificateDer::pem_slice_iter(pem) {
             self.extra_roots.push(cert.map_err(tls_err)?);
@@ -69,8 +72,8 @@ impl RustlsConnector {
         Ok(self)
     }
 
-    /// Use a fully custom rustls config. Only `alpn_protocols` is overridden per
-    /// connection; `verify` / mTLS / CA / key-log options from reqrio are ignored.
+    /// Use this rustls config as is. Only `alpn_protocols` is set per connection;
+    /// the session's verify, mTLS, CA and key-log settings are ignored.
     pub fn with_config(config: Arc<ClientConfig>) -> Self {
         RustlsConnector { custom: Some(config), ..RustlsConnector::new() }
     }
@@ -83,7 +86,7 @@ impl RustlsConnector {
             cfg.alpn_protocols = alpn;
             return Ok(Arc::new(cfg));
         }
-        // Only the common case is cached; identity / CA / key-log configs are built per call.
+        // configs with mTLS, a CA bundle or a key log are not cached
         let cacheable = opts.identity.is_none() && opts.ca_pem.is_none() && opts.key_log.is_none();
         let key = CacheKey { verify: opts.verify, version: opts.max_version, alpn };
         if cacheable {
@@ -175,7 +178,7 @@ struct RustlsStream(StreamOwned<ClientConnection, Box<dyn SyncIo>>);
 impl Read for RustlsStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         match self.0.read(buf) {
-            // Many servers close without close_notify; surface that as EOF.
+            // many servers close without close_notify; treat it as EOF
             Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => Ok(0),
             res => res,
         }
@@ -202,7 +205,7 @@ impl AsyncTlsIo for tokio_rustls::client::TlsStream<Box<dyn AsyncIo>> {
     fn alpn(&self) -> ALPN { alpn_of(self.get_ref().1.alpn_protocol()) }
 }
 
-/// Appends NSS key-log lines to a file.
+/// Writes NSS key-log lines to a file.
 #[derive(Debug)]
 struct FileKeyLog(String);
 
@@ -215,8 +218,8 @@ impl rustls::KeyLog for FileKeyLog {
     }
 }
 
-/// Accepts any certificate (used for `verify = false`) while still checking
-/// handshake signatures, so the peer must hold the key for the cert it sent.
+/// For `verify = false`: any certificate is accepted, but handshake signatures
+/// are still checked against it.
 #[derive(Debug)]
 struct NoVerify(WebPkiSupportedAlgorithms);
 

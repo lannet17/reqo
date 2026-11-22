@@ -5,7 +5,7 @@ use std::fmt::{Display, Formatter};
 use std::str::Utf8Error;
 
 
-/// HTTP response returned by the request engine.
+/// A response with its full body.
 #[repr(C)]
 pub struct Response {
     pub(crate) sid: u64,
@@ -28,37 +28,36 @@ impl Default for Response {
 }
 
 impl Response {
-    /// Return response headers.
+    /// Response headers.
     pub fn header(&self) -> &Header {
         &self.header
     }
 
-    /// Return response headers as mutable.
+    /// Response headers, mutable.
     pub fn header_mut(&mut self) -> &mut Header { &mut self.header }
 
-    /// Parse the response body as JSON.
-    /// Deserialize the body as JSON, e.g. `res.json::<MyStruct>()` or `res.json::<serde_json::Value>()`.
+    /// Parse the body as JSON: `res.json::<MyStruct>()`, `res.json::<serde_json::Value>()`.
     #[cfg(feature = "serde")]
     pub fn json<T: serde::de::DeserializeOwned>(&self) -> HlsResult<T> {
         serde_json::from_slice(self.body.filled()).map_err(|e| format!("json decode error: {}", e).into())
     }
 
-    /// Read the response body as UTF-8 text.
+    /// Body as `&str`; fails if it isn't UTF-8.
     pub fn as_text(&self) -> Result<&str, Utf8Error> { std::str::from_utf8(self.body.filled()) }
 
-    /// Consume the response and return the text body.
+    /// Body as `String`.
     pub fn text(self) -> Result<String, Utf8Error> { Ok(self.as_text()?.to_owned()) }
 
-    /// Return the raw response body bytes.
+    /// Body bytes.
     pub fn as_bytes(&self) -> &[u8] { self.body.filled() }
 
-    /// Consume the response and return the raw body bytes.
+    /// Body bytes as `Vec<u8>`.
     pub fn bytes(self) -> Vec<u8> { self.body.filled().to_vec() }
 
-    /// Return the HTTP status.
+    /// Status code.
     pub const fn status(&self) -> HttpStatus { self.status }
 
-    /// Return the negotiated ALPN value.
+    /// Protocol used for this response (HTTP/1.1 or HTTP/2).
     pub const fn alpn(&self) -> &ALPN { &self.alpn }
 
     pub const fn sid(&self) -> u64 { self.sid }

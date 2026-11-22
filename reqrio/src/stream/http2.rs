@@ -17,7 +17,7 @@ pub struct HTTP2Stream {
     stream: Stream,
     read_buffer: Writer,
     write_buffer: Writer,
-    /// Scratch space for one DATA frame payload.
+    // payload of one DATA frame
     body_buffer: Writer,
     increment: u32,
     #[cfg(feature = "aync")]

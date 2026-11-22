@@ -7,7 +7,7 @@ use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-/// Reusable synchronous HTTP client session.
+/// Blocking HTTP session: one connection, with its headers and cookies.
 pub struct Session {
     header: Header,
     stream: HTTPStream,
@@ -46,7 +46,7 @@ impl Default for Session {
 
 
 impl Session {
-    /// Create a new request session with default settings.
+    /// HTTP/2 preferred, certificate checks on, redirects followed.
     pub fn new() -> Session {
         Session::default()
     }
@@ -87,11 +87,8 @@ impl Session {
         self.do_http(Method::QUERY, url, body)
     }
 
-    /// Send a request and return its request id.
-    ///
-    /// * `method` - HTTP method.
-    /// * `url` - request URL.
-    /// * `body` - request body.
+    /// Send a request without waiting for the response. Returns an id for
+    /// [`recv`](Self::recv) / [`next_chunk`](Self::next_chunk).
     pub fn send<'a>(&mut self, method: Method, url: impl Into<ReqUrl<'a>>, body: impl Into<Body<'a>>) -> HlsResult<u64> {
         let url = url.into().build()?;
         self.set_url(url.as_ref())?;
@@ -107,9 +104,7 @@ impl Session {
         Ok(sid)
     }
 
-    /// Receive a response for a request id.
-    ///
-    /// * `sid` - request id returned by `send`.
+    /// Wait for the response to a request sent with [`send`](Self::send).
     pub fn recv(&mut self, sid: u64) -> HlsResult<Response> {
         if self.recv_ids.remove(&sid) && let Some(resp) = self.get_resp(sid) { return Ok(resp); }
         loop {
@@ -147,7 +142,7 @@ impl Session {
         Ok(Some(resp.body.slice(offset)))
     }
 
-    /// Streaming request; returns only the headers, and the request body must be consumed via `next_chunk`.
+    /// Send a request and wait only for the response headers. Read the body with [`next_chunk`](Self::next_chunk).
     pub fn send_stream<'a>(&mut self, method: Method, url: impl Into<ReqUrl<'a>>, body: impl Into<Body<'a>>) -> HlsResult<&StreamMessage> {
         let sid = self.send(method, url, body)?;
         self.recv_stream(sid)
@@ -235,11 +230,7 @@ impl Session {
         Ok(())
     }
 
-    /// Send a request and require an HTTP 200 status.
-    ///
-    /// * `method` - HTTP method.
-    /// * `url` - request URL.
-    /// * `body` - request body.
+    /// Like [`do_http`](Self::do_http), but a 4xx or 5xx status is an error.
     pub fn send_check<'a>(&mut self, method: Method, url: impl Into<ReqUrl<'a>>, body: impl Into<Body<'a>>) -> HlsResult<Response> {
         let url = url.into().build()?;
         let response = self.do_http(method, url.as_ref(), body.into())?;
@@ -247,9 +238,11 @@ impl Session {
         Ok(response)
     }
 
-    /// Send a request and validate errors, including body errors, then return JSON.
-    /// 1. Send the request and validate the HTTP status code; return an error if it is not 200.
-    /// 2. Compare the provided value using the supplied key, for example: {"code":200,..}; pass `k` as `code` and `v` as `200`. If it does not match, return an error.
+    /// [`send_check`](Self::send_check), then parse the body as JSON and require
+    /// `body[k] == v`. On mismatch the error is the first non-null `body[e]`,
+    /// or a generic message.
+    ///
+    /// For `{"code":200,"msg":"..."}`: `k = "code"`, `v = 200`, `e = vec!["msg"]`.
     #[cfg(feature = "serde")]
     pub fn send_check_json<'a>(
         &mut self,

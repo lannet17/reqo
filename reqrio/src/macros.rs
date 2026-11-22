@@ -1,12 +1,9 @@
 //! `body!` and `header!`.
 
-/// Build a request [`Body`](crate::Body) from `key: value` pairs.
+/// JSON [`Body`](crate::Body) from `key: value` pairs; `.form()` sends it as a form.
 ///
-/// * Sent as JSON by default; call `.form()` to send it as
-///   `application/x-www-form-urlencoded` instead.
-/// * Keys: string literals, identifiers, or `[expr]`.
-/// * Values: any [`ToJson`](crate::ToJson) expression (numbers, `bool`, `&str` / `String`,
-///   `Option`, `Vec`, maps...), `null`, or nested `{ ... }` / `[ ... ]`.
+/// Keys are string literals, identifiers or `[expr]`. Values are expressions of
+/// a [`ToJson`](crate::ToJson) type, `null`, or nested `{ ... }` / `[ ... ]`.
 ///
 /// ```
 /// use reqo::*;
@@ -29,8 +26,8 @@ macro_rules! body {
     };
 }
 
-/// Build a [`Header`](crate::Header) from `name: value` pairs, keeping their order.
-/// Values can be anything implementing `Display`; `cookie` is parsed into cookies.
+/// [`Header`](crate::Header) from `name: value` pairs, in the order written.
+/// Values can be any `Display` type. A `cookie` value is split into cookies.
 ///
 /// ```
 /// use reqo::*;

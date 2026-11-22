@@ -123,7 +123,7 @@ impl<'a, S: AsyncWrite + Unpin> Future for ProxyConnecting<'a, S> {
     }
 }
 
-/// Plain TCP → (optional proxy) → (optional TLS via the configured backend) → HTTP stream.
+// TCP -> proxy (if set) -> TLS (https/wss) -> HTTP/1.1 or HTTP/2.
 impl HTTPStream {
     pub(crate) fn connect_tcp_sync(tcp: std::net::TcpStream, tls: &TlsOptions<'_>, connector: &dyn TlsConnector, param: &ConnParam<'_>, finger: &Fingerprint) -> HlsResult<(ALPN, HTTPStream)> {
         let proxy_stream = ProxyStream::connect(tcp, param.url.addr(), param.proxy, param.timeout.clone()).wait()?;

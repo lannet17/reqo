@@ -18,7 +18,7 @@ impl Request {
 
     pub fn header_mut(&mut self) -> &mut Header { &mut self.header }
 
-    /// Deserialize the body as JSON, e.g. `res.json::<MyStruct>()` or `res.json::<serde_json::Value>()`.
+    /// Parse the body as JSON.
     #[cfg(feature = "serde")]
     pub fn json<T: serde::de::DeserializeOwned>(&self) -> HlsResult<T> {
         serde_json::from_slice(self.body.filled()).map_err(|e| format!("json decode error: {}", e).into())

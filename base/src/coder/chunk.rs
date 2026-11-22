@@ -7,11 +7,11 @@ use std::mem;
 
 pub struct ChunkDecoder {
     coder: TZCoder,
-    /// Size required for the current data block.
+    /// Length of the current chunk.
     want_size: usize,
-    /// Number of bytes already read from the current data block.
+    /// Bytes of the current chunk read so far.
     read_size: usize,
-    /// trim end
+    /// The `\r\n` after the chunk has been consumed.
     trim_end: bool,
     finish: bool,
     remain: Vec<u8>,
