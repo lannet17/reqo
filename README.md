@@ -173,6 +173,7 @@ let s = Session::new()
 ```
 
 - Trusted roots: `webpki-roots`, plus anything in `SSL_CERT_FILE`, plus `RustlsConnector::with_extra_roots_pem`.
+- If a server doesn't send its intermediate certificates, they are downloaded from the AIA URL in the certificate (plain HTTP, 5 s timeout) and cached. `RustlsConnector::with_aia(false)` turns this off.
 - `with_verify(false)` turns off certificate checks.
 - `reqo::tls::set_default_connector` sets the connector for sessions that have none, including `reqo::get` etc.
 

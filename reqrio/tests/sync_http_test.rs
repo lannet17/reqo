@@ -8,7 +8,6 @@ use reqo::ALPN;
 
 #[test]
 fn test_get() {
-    sync_http::init_tls();
     let mut req = Session::new().with_alpn(ALPN::HTTP11);
     sync_http::http_get_matrix(&mut req, ALPN::HTTP11);
     let mut req = Session::new().with_alpn(ALPN::HTTP20);
@@ -17,7 +16,6 @@ fn test_get() {
 
 #[test]
 fn test_method() {
-    sync_http::init_tls();
     let mut req = Session::new().with_alpn(ALPN::HTTP11);
     sync_http::http_method(&mut req);
     let mut req = Session::new().with_alpn(ALPN::HTTP20);
@@ -26,7 +24,6 @@ fn test_method() {
 
 #[test]
 fn test_status() {
-    sync_http::init_tls();
     let mut req = Session::new().with_alpn(ALPN::HTTP11);
     sync_http::http_status(&mut req);
     let mut req = Session::new().with_alpn(ALPN::HTTP20);
@@ -36,7 +33,6 @@ fn test_status() {
 
 #[test]
 fn test_auth() {
-    sync_http::init_tls();
     let mut req = Session::new().with_alpn(ALPN::HTTP11);
     sync_http::http_auth(&mut req);
     let mut req = Session::new().with_alpn(ALPN::HTTP20);
@@ -46,7 +42,6 @@ fn test_auth() {
 
 #[test]
 fn test_query_param() {
-    sync_http::init_tls();
     let mut req = Session::new().with_alpn(ALPN::HTTP11);
     sync_http::query_param(&mut req);
     let mut req = Session::new().with_alpn(ALPN::HTTP20);
@@ -55,7 +50,6 @@ fn test_query_param() {
 
 #[test]
 fn test_redirect() {
-    sync_http::init_tls();
     let mut req = Session::new().with_alpn(ALPN::HTTP11);
     sync_http::http_redirect(&mut req);
     let mut req = Session::new().with_alpn(ALPN::HTTP20);
@@ -64,7 +58,6 @@ fn test_redirect() {
 
 #[test]
 fn test_cookie() {
-    sync_http::init_tls();
     let mut req = Session::new().with_alpn(ALPN::HTTP11);
     sync_http::http_cookie(&mut req);
     let mut req = Session::new().with_alpn(ALPN::HTTP20);
@@ -73,7 +66,6 @@ fn test_cookie() {
 
 #[test]
 fn test_headers() {
-    sync_http::init_tls();
     let mut req = Session::new().with_alpn(ALPN::HTTP11);
     sync_http::http_header(&mut req);
     let mut req = Session::new().with_alpn(ALPN::HTTP20);
@@ -82,7 +74,6 @@ fn test_headers() {
 
 #[test]
 fn test_stream_req() {
-    sync_http::init_tls();
     let mut req = Session::new().with_alpn(ALPN::HTTP11);
     sync_http::http_stream(&mut req);
     let mut req = Session::new().with_alpn(ALPN::HTTP20);
@@ -92,7 +83,6 @@ fn test_stream_req() {
 
 #[test]
 fn test_helper() {
-    sync_http::init_tls();
     let mut req = Session::new().with_alpn(ALPN::HTTP11);
     sync_http::http_helper(&mut req);
     let mut req = Session::new().with_alpn(ALPN::HTTP20);
@@ -101,7 +91,6 @@ fn test_helper() {
 
 #[test]
 fn test_body() {
-    sync_http::init_tls();
     let mut req = Session::new().with_alpn(ALPN::HTTP11);
     sync_http::http_body(&mut req);
     let mut req = Session::new().with_alpn(ALPN::HTTP20);
@@ -111,7 +100,6 @@ fn test_body() {
 
 #[test]
 fn test_concurrency() {
-    sync_http::init_tls();
     let mut req = Session::new().with_alpn(ALPN::HTTP11);
     sync_http::http_concurrency(&mut req);
     let mut req = Session::new().with_alpn(ALPN::HTTP20);
@@ -120,7 +108,6 @@ fn test_concurrency() {
 
 #[test]
 fn http_one_shot_api() {
-    sync_http::init_tls();
     let res = reqo::get("https://httpbin.reqrio.com/get", None).unwrap();
     assert_eq!(res.status(), HttpStatus::OK);
     let res = res.json::<serde_json::Value>().unwrap();
@@ -139,7 +126,6 @@ fn http_one_shot_api() {
 
 #[test]
 fn test_large_body() {
-    sync_http::init_tls();
     let mut req = Session::new().with_alpn(ALPN::HTTP11);
     let resp = req.get("https://httpbin.reqrio.com/bytes/65536", None).unwrap();
     assert_eq!(resp.status(), HttpStatus::OK);
@@ -153,7 +139,6 @@ fn test_large_body() {
 
 #[test]
 fn test_timeout() {
-    sync_http::init_tls();
     let mut req = Session::new().with_timeout(Timeout::new_same(3000, 1));
     let start = Instant::now();
     let res = req.get("https://192.0.2.1/", None);

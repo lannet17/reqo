@@ -4,17 +4,6 @@ use reqo::{Application, ContentType, FileForm, HttpFile, HttpStatus, ImageType, 
 use reqo::{ALPN, base64, coder, rand};
 use serde_json::Value;
 
-/// httpbin.reqrio.com doesn't send the "Root YR" certificate cross-signed by
-/// ISRG Root X1, so trust it directly until the server sends its full chain.
-pub fn init_tls() {
-    static ONCE: std::sync::Once = std::sync::Once::new();
-    ONCE.call_once(|| {
-        let connector = reqo::tls::RustlsConnector::new()
-            .with_extra_roots_pem(include_bytes!("data/isrg-root-yr-by-x1.pem"))
-            .unwrap();
-        reqo::tls::set_default_connector(std::sync::Arc::new(connector));
-    });
-}
 
 /// Old `JsonValue::dump()` semantics: strings raw, everything else as JSON text.
 pub trait Dump {

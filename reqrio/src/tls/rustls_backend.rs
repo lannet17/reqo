@@ -1,6 +1,8 @@
 //! rustls connector (ring, webpki-roots).
 
+use super::aia::{AiaCache, AiaVerifier};
 use super::{SyncIo, TlsConnector, TlsIo, TlsOptions, TlsVersion};
+use rustls::client::WebPkiServerVerifier;
 use crate::error::{HlsError, HlsResult};
 use crate::{hex, ALPN};
 use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
@@ -22,6 +24,10 @@ use super::{AsyncIo, AsyncTlsIo, BoxFuture};
 /// once, in [`new`](Self::new)) and any added with
 /// [`with_extra_roots_pem`](Self::with_extra_roots_pem).
 ///
+/// If the server doesn't send its full chain, the missing intermediates are
+/// downloaded from the AIA URLs in the certificates (as browsers do) and kept
+/// for later connections. Turn this off with [`with_aia`](Self::with_aia).
+///
 /// The rustls config is kept per (verify, version, ALPN), so later connections
 /// can resume the TLS session. Configs with mTLS, a CA bundle or a key log are
 /// built for each connection.
@@ -29,6 +35,8 @@ pub struct RustlsConnector {
     provider: Arc<CryptoProvider>,
     custom: Option<Arc<ClientConfig>>,
     extra_roots: Vec<CertificateDer<'static>>,
+    aia: bool,
+    aia_cache: AiaCache,
     cache: Mutex<HashMap<CacheKey, Arc<ClientConfig>>>,
 }
 
@@ -59,8 +67,17 @@ impl RustlsConnector {
             provider: Arc::new(rustls::crypto::ring::default_provider()),
             custom: None,
             extra_roots,
+            aia: true,
+            aia_cache: AiaCache::default(),
             cache: Mutex::new(HashMap::new()),
         }
+    }
+
+    /// Download missing intermediate certificates from AIA URLs (default `true`).
+    /// The download is plain HTTP, during the handshake, with a 5 s timeout.
+    pub fn with_aia(mut self, aia: bool) -> Self {
+        self.aia = aia;
+        self
     }
 
     /// Also trust the certificates in `pem`. Adding an intermediate certificate
@@ -118,7 +135,14 @@ impl RustlsConnector {
                     roots.add_parsable_certificates(self.extra_roots.iter().cloned());
                 }
             }
-            builder.with_root_certificates(roots)
+            let verifier = WebPkiServerVerifier::builder_with_provider(Arc::new(roots), self.provider.clone())
+                .build()
+                .map_err(tls_err)?;
+            if self.aia {
+                builder.dangerous().with_custom_certificate_verifier(Arc::new(AiaVerifier::new(verifier, self.aia_cache.clone())))
+            } else {
+                builder.with_webpki_verifier(verifier)
+            }
         } else {
             builder.dangerous().with_custom_certificate_verifier(Arc::new(NoVerify(
                 self.provider.signature_verification_algorithms,

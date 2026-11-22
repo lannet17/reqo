@@ -8,7 +8,6 @@ use std::time::Instant;
 
 #[tokio::test]
 async fn test_get() {
-    async_http::init_tls();
     let mut req = Session::new().with_alpn(ALPN::HTTP11);
     async_http::http_get_matrix(&mut req, ALPN::HTTP11).await;
     let mut req = Session::new().with_alpn(ALPN::HTTP20);
@@ -17,7 +16,6 @@ async fn test_get() {
 
 #[tokio::test]
 async fn test_method() {
-    async_http::init_tls();
     let mut req = Session::new().with_alpn(ALPN::HTTP11);
     async_http::http_method(&mut req).await;
     let mut req = Session::new().with_alpn(ALPN::HTTP20);
@@ -26,7 +24,6 @@ async fn test_method() {
 
 #[tokio::test]
 async fn test_status() {
-    async_http::init_tls();
     let mut req = Session::new().with_alpn(ALPN::HTTP11);
     async_http::http_status(&mut req).await;
     let mut req = Session::new().with_alpn(ALPN::HTTP20);
@@ -36,7 +33,6 @@ async fn test_status() {
 
 #[tokio::test]
 async fn test_auth() {
-    async_http::init_tls();
     let mut req = Session::new().with_alpn(ALPN::HTTP11);
     async_http::http_auth(&mut req).await;
     let mut req = Session::new().with_alpn(ALPN::HTTP20);
@@ -46,7 +42,6 @@ async fn test_auth() {
 
 #[tokio::test]
 async fn test_query_param() {
-    async_http::init_tls();
     let mut req = Session::new().with_alpn(ALPN::HTTP11);
     async_http::query_param(&mut req).await;
     let mut req = Session::new().with_alpn(ALPN::HTTP20);
@@ -55,7 +50,6 @@ async fn test_query_param() {
 
 #[tokio::test]
 async fn test_redirect() {
-    async_http::init_tls();
     let mut req = Session::new().with_alpn(ALPN::HTTP11);
     async_http::http_redirect(&mut req).await;
     let mut req = Session::new().with_alpn(ALPN::HTTP20);
@@ -64,7 +58,6 @@ async fn test_redirect() {
 
 #[tokio::test]
 async fn test_cookie() {
-    async_http::init_tls();
     let mut req = Session::new().with_alpn(ALPN::HTTP11);
     async_http::http_cookie(&mut req).await;
     let mut req = Session::new().with_alpn(ALPN::HTTP20);
@@ -73,7 +66,6 @@ async fn test_cookie() {
 
 #[tokio::test]
 async fn test_headers() {
-    async_http::init_tls();
     let mut req = Session::new().with_alpn(ALPN::HTTP11);
     async_http::http_header(&mut req).await;
     let mut req = Session::new().with_alpn(ALPN::HTTP20);
@@ -82,7 +74,6 @@ async fn test_headers() {
 
 #[tokio::test]
 async fn test_stream_req() {
-    async_http::init_tls();
     let mut req = Session::new().with_alpn(ALPN::HTTP11);
     async_http::http_stream(&mut req).await;
     let mut req = Session::new().with_alpn(ALPN::HTTP20);
@@ -92,7 +83,6 @@ async fn test_stream_req() {
 
 #[tokio::test]
 async fn test_helper() {
-    async_http::init_tls();
     let mut req = Session::new().with_alpn(ALPN::HTTP11);
     async_http::http_helper(&mut req).await;
     let mut req = Session::new().with_alpn(ALPN::HTTP20);
@@ -101,7 +91,6 @@ async fn test_helper() {
 
 #[tokio::test]
 async fn test_body() {
-    async_http::init_tls();
     let mut req = Session::new().with_alpn(ALPN::HTTP11);
     async_http::http_body(&mut req).await;
     let mut req = Session::new().with_alpn(ALPN::HTTP20);
@@ -111,7 +100,6 @@ async fn test_body() {
 
 #[tokio::test]
 async fn test_concurrency() {
-    async_http::init_tls();
     let mut req = Session::new().with_alpn(ALPN::HTTP11);
     async_http::http_concurrency(&mut req).await;
     let mut req = Session::new().with_alpn(ALPN::HTTP20);
@@ -120,7 +108,6 @@ async fn test_concurrency() {
 
 #[tokio::test]
 async fn test_large_body() {
-    async_http::init_tls();
     let mut req = Session::new().with_alpn(ALPN::HTTP11);
     let resp = req.get("https://httpbin.reqrio.com/bytes/65536", None).await.unwrap();
     assert_eq!(resp.status(), HttpStatus::OK);
@@ -133,7 +120,6 @@ async fn test_large_body() {
 
 #[tokio::test]
 async fn  test_timeout() {
-    async_http::init_tls();
     let mut req = Session::new().with_timeout(Timeout::new_same(3000, 1));
     let start = Instant::now();
     let res = req.get("https://192.0.2.1/", None).await;

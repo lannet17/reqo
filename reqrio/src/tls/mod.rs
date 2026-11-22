@@ -8,6 +8,8 @@
 //! Change it with [`ReqExt::set_tls_connector`](crate::ReqExt::set_tls_connector).
 
 #[cfg(feature = "rustls")]
+mod aia;
+#[cfg(feature = "rustls")]
 mod rustls_backend;
 
 use crate::error::HlsResult;
