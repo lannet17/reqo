@@ -1,4 +1,3 @@
-use crate::json::JsonError;
 use crate::pack::PackError;
 use reqo_base::{hex, BaseError, BufferError, UrlError, ALPN};
 use std::array::TryFromSliceError;
@@ -109,12 +108,6 @@ impl From<Infallible> for HlsError {
 impl From<PackError> for HlsError {
     fn from(value: PackError) -> Self {
         HlsError::HPack(value)
-    }
-}
-
-impl From<JsonError> for HlsError {
-    fn from(value: JsonError) -> Self {
-        HlsError::Currently(value.to_string())
     }
 }
 

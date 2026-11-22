@@ -11,6 +11,8 @@ pub struct HeaderItem {
 }
 
 impl HeaderItem {
+    pub(crate) fn into_parts(self) -> (Cow<'static, str>, HeaderValue) { (self.name, self.value) }
+
     pub const fn none() -> HeaderItem {
         HeaderItem {
             name: Cow::Borrowed(""),

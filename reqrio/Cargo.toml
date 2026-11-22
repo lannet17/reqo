@@ -8,9 +8,9 @@ license-file = "../LICENSE-APACHE"
 repository = "https://github.com/lannet17/reqo"
 
 [dependencies]
-reqrio-json = { workspace = true }
 reqo-base = { workspace = true }
 serde = { workspace = true, optional = true }
+serde_json = { version = "1", optional = true }
 log = { version = "0.4", default-features = false, optional = true }
 tokio = { version = "1", features = ["time", "net", "io-util", "macros", "rt-multi-thread"], optional = true }
 # Default TLS backend. Disable default features to plug in your own `TlsConnector`.
@@ -18,8 +18,21 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 webpki-roots = { version = "1", optional = true }
 tokio-rustls = { version = "0.26", default-features = false, optional = true }
 
+[dev-dependencies]
+serde_json = "1"
+
+[[test]]
+name = "sync_http_test"
+required-features = ["serde"]
+
+[[test]]
+name = "async_http_test"
+required-features = ["aync", "serde"]
+
 [features]
 default = ["rustls"]
+# `Response::json::<T>()`, `Body::json(&T)` and serde derives.
+serde = ["dep:serde", "dep:serde_json"]
 rustls = ["dep:rustls", "dep:webpki-roots"]
 aync = ["dep:tokio", "dep:tokio-rustls"]
 log = ["dep:log"]

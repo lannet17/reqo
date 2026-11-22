@@ -149,13 +149,12 @@ mod tests {
     use super::HTTP1Stream;
     use crate::stream::Stream;
     use crate::stream::http1::SendParam;
-    use crate::{Header, Method, json};
-    use reqrio_json::JsonValue;
+    use crate::{body, header, Header, Method};
     use reqo_base::Url;
 
     #[test]
     fn test_h1_hdr_encode() {
-        let headers = json::object! {
+        let headers = header! {
             "Connection": "keep-alive",
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 MicroMessenger/7.0.20.1781(0x6700143B) NetType/WIFI MiniProgramEnv/Windows WindowsWechat/WMPF WindowsWechat(0x63090a13) UnifiedPCWindowsWechat(0xf254181b) XWEB/20001",
             "Accept": "application/json",
@@ -170,7 +169,7 @@ mod tests {
             "Accept-Language": "zh-CN,zh;q=0.9",
         };
         let mut header = Header::default();
-        header.set_by_json(headers.clone());
+        header.merge(headers);
         header.insert("host", "xxxxx");
         header.insert("content-length", "748");
         header.insert("cookie", "wzws_sid=xxx; sid=123455667");
@@ -180,7 +179,7 @@ mod tests {
         stream.encode_hdr(748, &SendParam {
             method: Method::GET,
             url: &url,
-            body: JsonValue::Null.into(),
+            body: body! {},
             priority: false,
             header: &header,
             weight: 0,

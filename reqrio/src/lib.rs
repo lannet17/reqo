@@ -66,19 +66,14 @@
 //! ```rust
 //! # use reqo::*;
 //! # fn ff() {
-//! let params = json::object! {
-//!     "p1": 1,
-//!     "p2": "??34//11<<><"
-//! };
-//!
 //! // Send GET request with query parameters
-//! let mut res = reqo::get("https://www.baidu.com".params(params), None).unwrap();
+//! let res = reqo::get("https://www.baidu.com".params([("p1", "1"), ("p2", "??34//11<<><")]), None).unwrap();
 //!
-//! // Access response headers
+//! // Access response headers and body
 //! let header = res.header();
+//! let text = res.text().unwrap();
 //!
-//! // Parse as JSON
-//! let json = res.json().unwrap();
+//! // With the `serde` feature: `let v: serde_json::Value = res.json().unwrap();`
 //! # }
 //! ```
 //!
@@ -87,9 +82,9 @@
 //! # use reqo::*;
 //! # fn ff() {
 //! let url = "https://www.baidu.com/api";
-//! let data = json::object! {
+//! let data = body! {
 //!     "field1": "value1",
-//!     "field2": "value2"
+//!     "field2": 2
 //! };
 //!
 //! let resp = reqo::post(url, data.form()).unwrap();
@@ -101,9 +96,9 @@
 //! # use reqo::*;
 //! # fn ff() {
 //! let url = "https://www.baidu.com/api";
-//! let data = json::object! {
+//! let data = body! {
 //!     "field1": "value1",
-//!     "field2": "value2"
+//!     "field2": { "nested": [1, 2, 3] }
 //! };
 //!
 //! let resp = reqo::post(url, data).unwrap();
@@ -139,7 +134,7 @@
 //! ```rust
 //! # use reqo::*;
 //! # fn example() -> Result<(), Box<dyn std::error::Error>> {
-//! let headers = json::object! {
+//! let headers = header! {
 //!     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
 //!     "Accept-Encoding": "gzip, deflate, br, zstd",
 //!     "Accept-Language": "en-US,en;q=0.9",
@@ -148,14 +143,11 @@
 //!
 //! let mut session = ScReq::new()
 //!     .with_alpn(ALPN::HTTP20)                    // Use HTTP/2.0 for modern sites
-//!     .with_header_json(headers)                 // Set browser-compatible headers
+//!     .with_header(headers)                      // Set browser-compatible headers
 //!     .with_timeout(Timeout::new_same(5000, 3)); // 5s timeout with 3 retries
 //!
-//! // Configure TLS fingerprint (if subscription available)
-//! // session.set_fingerprint(Fingerprint::chrome_120());
-//!
 //! // Make requests with persistent session state
-//! let resp = session.post("https://api.example.com/data", json::object! {"key": "value"})?;
+//! let resp = session.post("https://api.example.com/data", body! {"key": "value"})?;
 //! # Ok(())
 //! # }
 //! ```
@@ -264,7 +256,6 @@
 //! ## Ecosystem Integration
 //!
 //! - **reqo-base**: Buffers, URL types and content coding shared with TLS backends
-//! - **reqrio-json**: Built-in JSON utilities
 //! - **pack**: HTTP/2 header compression support
 //!
 //! For more examples and advanced usage, visit the [GitHub repository](https://github.com/xllgl2017/reqrio)
@@ -282,6 +273,7 @@ mod fingerprint;
 mod reader;
 mod cookie;
 pub mod tls;
+mod macros;
 mod time;
 #[cfg(feature = "log")]
 mod logger;
@@ -292,7 +284,9 @@ pub const CHUNK_END: [u8; 7] = [13, 10, 48, 13, 10, 13, 10];
 
 #[cfg(feature = "aync")]
 pub use acq::AcReq;
-pub use body::{Body, FileForm, HttpFile, BodyData, BodyExt};
+pub use body::{Body, BodyExt, Field, FileForm, HttpFile, ToJson};
+#[doc(hidden)]
+pub use body::__private;
 pub use error::{HlsError, HlsResult};
 pub use ext::{ReqExt, ReqStreamExt, UrlExt};
 pub use fingerprint::{Fingerprint, H2Finger};
@@ -303,7 +297,6 @@ pub use packet::{
 };
 #[cfg(feature = "quic")]
 pub use packet::{H3Payload, H3FrameType, H3Setting, H3Frame};
-pub use reqrio_json as json;
 pub use reqo_base::*;
 #[cfg(feature = "log")]
 pub use log::*;

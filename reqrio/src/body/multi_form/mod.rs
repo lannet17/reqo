@@ -8,7 +8,6 @@ use crate::body::multi_form::field::FormField;
 use crate::reader::RefReader;
 pub use error::FormError;
 pub use reader::HttpFileReader;
-use reqrio_json::JsonValue;
 use std::path::Path;
 use std::sync::Arc;
 pub use file_form::FileForm;
@@ -16,12 +15,18 @@ pub use file_form::FileForm;
 /// * File upload example
 /// ```no_run
 /// use reqo::*;
-/// let data=json::object!{"key":"value"};
+/// let data=[("key","value")];
 /// let mut file=HttpFile::new_path_data(data,"path/to/file1").unwrap();
 /// file.add_form(FileForm::new_path("path/to/file2").unwrap());
 /// let mut req=ScReq::new();
 /// req.post("https://url/api",file).unwrap();
 /// ```
+const NO_DATA: [(&str, &str); 0] = [];
+
+fn fields(data: impl IntoIterator<Item = (impl Into<String>, impl ToString)>) -> Vec<FormField> {
+    data.into_iter().map(|(k, v)| FormField::new(k.into(), v.to_string())).collect()
+}
+
 pub struct HttpFile {
     data: Vec<FormField>,
     forms: Vec<FileForm>,
@@ -41,12 +46,12 @@ impl Default for HttpFile {
 impl HttpFile {
     #[inline]
     pub fn new_bytes(bytes: impl Into<Vec<u8>>) -> HttpFile {
-        HttpFile::new_bytes_data(JsonValue::Null, bytes)
+        HttpFile::new_bytes_data(NO_DATA, bytes)
     }
 
-    pub fn new_bytes_data(data: JsonValue, bytes: impl Into<Vec<u8>>) -> HttpFile {
+    pub fn new_bytes_data(data: impl IntoIterator<Item = (impl Into<String>, impl ToString)>, bytes: impl Into<Vec<u8>>) -> HttpFile {
         HttpFile {
-            data: data.into_entries().map(|(k, v)| FormField::new(k, v.dump())).collect(),
+            data: fields(data),
             forms: vec![FileForm::new_bytes(bytes)],
             boundary: Arc::new("".to_string()),
         }
@@ -54,12 +59,12 @@ impl HttpFile {
 
     #[inline]
     pub fn new_path(path: impl AsRef<Path>) -> HlsResult<HttpFile> {
-        HttpFile::new_path_data(JsonValue::Null, path)
+        HttpFile::new_path_data(NO_DATA, path)
     }
 
-    pub fn new_path_data(data: JsonValue, path: impl AsRef<Path>) -> HlsResult<HttpFile> {
+    pub fn new_path_data(data: impl IntoIterator<Item = (impl Into<String>, impl ToString)>, path: impl AsRef<Path>) -> HlsResult<HttpFile> {
         Ok(HttpFile {
-            data: data.into_entries().map(|(k, v)| FormField::new(k, v.dump())).collect(),
+            data: fields(data),
             forms: vec![FileForm::new_path(path)?],
             boundary: Arc::new("".to_string()),
         })
@@ -67,19 +72,19 @@ impl HttpFile {
 
     #[inline]
     pub fn new_form(form: FileForm) -> HttpFile {
-        HttpFile::new_form_data(JsonValue::Null, form)
+        HttpFile::new_form_data(NO_DATA, form)
     }
 
-    pub fn new_form_data(data: JsonValue, form: FileForm) -> HttpFile {
+    pub fn new_form_data(data: impl IntoIterator<Item = (impl Into<String>, impl ToString)>, form: FileForm) -> HttpFile {
         HttpFile {
-            data: data.into_entries().map(|(k, v)| FormField::new(k, v.dump())).collect(),
+            data: fields(data),
             forms: vec![form],
             boundary: Arc::new("".to_string()),
         }
     }
 
-    pub fn set_data(&mut self, data: JsonValue) {
-        self.data = data.into_entries().map(|(k, v)| FormField::new(k, v.dump())).collect();
+    pub fn set_data(&mut self, data: impl IntoIterator<Item = (impl Into<String>, impl ToString)>) {
+        self.data = fields(data);
     }
 
     #[inline]

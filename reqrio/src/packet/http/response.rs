@@ -1,5 +1,5 @@
+#[cfg(feature = "serde")]
 use crate::error::HlsResult;
-use crate::json::JsonValue;
 use crate::*;
 use std::fmt::{Display, Formatter};
 use std::str::Utf8Error;
@@ -37,7 +37,11 @@ impl Response {
     pub fn header_mut(&mut self) -> &mut Header { &mut self.header }
 
     /// Parse the response body as JSON.
-    pub fn json(self) -> HlsResult<JsonValue> { Ok(json::from_bytes(self.body.filled())?) }
+    /// Deserialize the body as JSON, e.g. `res.json::<MyStruct>()` or `res.json::<serde_json::Value>()`.
+    #[cfg(feature = "serde")]
+    pub fn json<T: serde::de::DeserializeOwned>(&self) -> HlsResult<T> {
+        serde_json::from_slice(self.body.filled()).map_err(|e| format!("json decode error: {}", e).into())
+    }
 
     /// Read the response body as UTF-8 text.
     pub fn as_text(&self) -> Result<&str, Utf8Error> { std::str::from_utf8(self.body.filled()) }

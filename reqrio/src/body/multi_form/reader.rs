@@ -146,13 +146,13 @@ impl<'a> ReadExt for FileFormReader<'a> {
 #[cfg(test)]
 mod tests {
     use crate::reader::ReadExt;
-    use crate::{json, HttpFile};
+    use crate::HttpFile;
     use reqo_base::Writer;
     use std::sync::Arc;
 
     #[test]
     fn test_files_reader() {
-        let file = HttpFile::new_bytes_data(json::object! {"test filed":"value"}, b"test file data")
+        let file = HttpFile::new_bytes_data([("test filed", "value")], b"test file data")
             .with_boundary(Arc::new("----WebKitFormBoundary1234567812345678".to_string()));
         let mut reader = file.as_reader().unwrap();
         let mut writer = Writer::with_capacity(1024);

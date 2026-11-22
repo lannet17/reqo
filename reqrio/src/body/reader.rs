@@ -39,22 +39,22 @@ impl<'a> ReadExt for RawBodyReader<'a> {
 #[cfg(test)]
 mod tests {
     use crate::reader::*;
-    use crate::{Body, BodyData, json};
+    use crate::{body, Body};
     use reqo_base::Writer;
 
     #[test]
     fn test_h1_reader() {
-        let data = json::object! {
+        let data = || body! {
             "a":1,
             "b":"收到反馈",
             "v":{k:1,b:true}
         };
-        let body = data.form();
+        let body = data().form();
         let mut body_reader = body.as_reader().unwrap();
         let mut writer = Writer::with_capacity(1024);
         let len = body_reader.read(&mut writer).unwrap();
         assert_eq!(&writer.filled()[..len], b"a=1&b=%E6%94%B6%E5%88%B0%E5%8F%8D%E9%A6%88&v=%7B%22k%22%3A1%2C%22b%22%3Atrue%7D");
-        let body = Body::from(data);
+        let body = data();
         let mut body_reader = body.as_reader().unwrap();
         writer.reset();
         let len = body_reader.read(&mut writer).unwrap();

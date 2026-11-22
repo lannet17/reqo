@@ -3,7 +3,6 @@ use crate::ext::{ReqPriExt, ReqUrl};
 use crate::stream::{HTTPStream, SendParam, Stream};
 use crate::*;
 use crate::tls::{ClientIdentity, TlsConnector, TlsSettings, TlsVersion};
-use json::JsonValue;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -251,6 +250,7 @@ impl ScReq {
     /// Send a request and validate errors, including body errors, then return JSON.
     /// 1. Send the request and validate the HTTP status code; return an error if it is not 200.
     /// 2. Compare the provided value using the supplied key, for example: {"code":200,..}; pass `k` as `code` and `v` as `200`. If it does not match, return an error.
+    #[cfg(feature = "serde")]
     pub fn send_check_json<'a>(
         &mut self,
         method: Method,
@@ -259,7 +259,7 @@ impl ScReq {
         k: impl AsRef<str>,
         v: impl ToString,
         e: Vec<impl AsRef<str>>,
-    ) -> HlsResult<JsonValue> {
+    ) -> HlsResult<serde_json::Value> {
         let response = self.send_check(method, url, body.into())?;
         self.check_res(response, k, v, e)
     }

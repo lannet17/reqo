@@ -13,6 +13,11 @@ First release as `reqo`, forked from reqrio 0.4.2. TLS is now pluggable and rust
   and `pub use reqtls::*`. `HlsError::Rls` was replaced by `HlsError::Base` / `HlsError::Tls`.
 * Fix: HTTP/1.1 pipelining stalled when the next response was already buffered, and a compressed body
   could be decoded past its `Content-Length`.
+* Removed the `reqrio-json` crate. New macros instead:
+  `body!{..}` builds a JSON body (`body!{..}.form()` for urlencoded), `header!{..}` builds a `Header`.
+  Values are plain std types (`ToJson`); there is no JSON value type in reqo anymore.
+* `Response::json::<T>()` / `Body::json(&T)` (serde) live behind the optional `serde` feature.
+* `params()` and multipart data take key/value pairs; `set_headers_json` became `merge_headers(Header)`.
 * `quic` (HTTP/3) is not available with the pluggable TLS layer yet.
 
 # reqrio-v0.4.1

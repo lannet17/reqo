@@ -1,4 +1,5 @@
 mod ext;
+mod fields;
 mod reader;
 mod multi_form;
 
@@ -6,10 +7,12 @@ use crate::error::HlsResult;
 use crate::reader::{HCow, ReadExt, RefReader, StrCow};
 use crate::*;
 use crate::{Application, ContentType, Text};
-pub use ext::{BodyData, BodyExt};
+pub use ext::BodyExt;
 pub use multi_form::{FileForm, FormError, HttpFile};
 pub use reader::RawBodyReader;
-use reqrio_json::JsonValue;
+pub use fields::{Field, ToJson};
+#[doc(hidden)]
+pub use fields::__private;
 use reqo_base::{hash, rand};
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -17,7 +20,8 @@ use std::borrow::Cow;
 use std::sync::Arc;
 
 pub enum BodyKind<'a> {
-    Data(HCow<'a, JsonValue>),
+    /// Fields from `body!` / `Body::json`; JSON or urlencoded depending on the content type.
+    Fields(HCow<'a, Vec<Field>>),
     Bytes(Cow<'a, [u8]>),
     Files(HCow<'a, HttpFile>),
 }
@@ -25,7 +29,7 @@ pub enum BodyKind<'a> {
 impl<'a, 'b: 'a> From<&'b BodyKind<'a>> for BodyKind<'a> {
     fn from(value: &'b BodyKind) -> Self {
         match value {
-            BodyKind::Data(data) => BodyKind::Data(HCow::Borrowed(data.as_ref())),
+            BodyKind::Fields(data) => BodyKind::Fields(HCow::Borrowed(data.as_ref())),
             BodyKind::Bytes(bytes) => BodyKind::Bytes(Cow::Borrowed(bytes.as_ref())),
             BodyKind::Files(file) => BodyKind::Files(HCow::Borrowed(file.as_ref())),
         }
@@ -47,23 +51,6 @@ impl<'a, 'b: 'a> From<&'b Body<'a>> for Body<'a> {
     }
 }
 
-impl<'a> From<&'a JsonValue> for Body<'a> {
-    fn from(json: &'a JsonValue) -> Body<'a> {
-        Body {
-            kind: BodyKind::Data(HCow::Borrowed(json)),
-            ct: ContentType::json(),
-        }
-    }
-}
-
-impl<'a> From<JsonValue> for Body<'a> {
-    fn from(json: JsonValue) -> Body<'a> {
-        Body {
-            kind: BodyKind::Data(HCow::Owned(json)),
-            ct: ContentType::json(),
-        }
-    }
-}
 
 impl<'a> From<&'a [u8]> for Body<'a> {
     fn from(bytes: &'a [u8]) -> Body<'a> {
@@ -159,48 +146,56 @@ impl<'a> Body<'a> {
         }
     }
 
-    #[cfg(feature = "serde")]
-    /// Build a JSON request body from a serializable value.
-    pub fn json<T: Serialize>(value: &T) -> HlsResult<Body<'a>> {
-        let bytes = json::to_string(value).map_err(|e| format!("struct to json error, {}", e))?;
-        Ok(Body {
-            kind: BodyKind::Bytes(Cow::Owned(bytes.into_bytes())),
-            ct: ContentType::json(),
-        })
+    /// Body from `key: value` fields, sent as JSON. Usually built with [`body!`](crate::body!).
+    pub fn from_fields(fields: Vec<Field>) -> Body<'a> {
+        Body { kind: BodyKind::Fields(HCow::Owned(fields)), ct: ContentType::json() }
+    }
+
+    /// The `key: value` fields, if this body was built from fields.
+    pub fn fields(&self) -> Option<&[Field]> {
+        match &self.kind {
+            BodyKind::Fields(f) => Some(f.as_slice()),
+            _ => None,
+        }
+    }
+
+    /// Send the same fields as `application/x-www-form-urlencoded`
+    /// (string values unquoted, other values as their JSON text).
+    pub fn form(mut self) -> Body<'a> {
+        self.ct = ContentType::form();
+        self
     }
 
     #[cfg(feature = "serde")]
-    pub fn form<T: Serialize>(value: &T) -> HlsResult<Body<'a>> {
-        let form = json::from_struct(value).map_err(|e| format!("struct to json error, {}", e))?;
-        Ok(Body {
-            kind: BodyKind::Data(HCow::Owned(form)),
-            ct: ContentType::form(),
+    /// JSON body from any `Serialize` value. A struct / map can be turned into a form with `.form()`.
+    pub fn json<T: Serialize + ?Sized>(value: &T) -> HlsResult<Body<'a>> {
+        let value = serde_json::to_value(value).map_err(|e| format!("struct to json error, {}", e))?;
+        Ok(match value {
+            serde_json::Value::Object(map) => Body::from_fields(map.iter().map(|(k, v)| Field::new(k.as_str(), v)).collect()),
+            other => Body {
+                kind: BodyKind::Bytes(Cow::Owned(other.to_string().into_bytes())),
+                ct: ContentType::json(),
+            },
         })
     }
 
     pub(crate) fn as_reader(&'a self) -> HlsResult<RawBodyReader<'a>> {
         match &self.kind {
-            BodyKind::Data(data) => {
-                if let ContentType::Application(Application::Json) = self.ct {
-                    Ok(RawBodyReader::Data(RefReader::new_buf(StrCow::Owned(data.dump()))))
-                } else {
-                    let mut readers: RefReader<StrCow> = RefReader::default();
-                    for (i, (k, v)) in data.entries().enumerate() {
-                        readers.add_str(k);
-                        readers.add_str("=");
-                        match v.as_str() {
-                            Ok(v) => {
-                                match coder::url_encode(v) {
-                                    Cow::Borrowed(_) => readers.add_str(v),
-                                    Cow::Owned(o) => readers.add_string(o)
-                                }
-                            }
-                            Err(_) => readers.add_string(coder::url_encode(v.dump()).into_owned())
-                        }
-                        if i != data.entries().count() - 1 { readers.add_str("&") }
-                    }
-                    Ok(RawBodyReader::Data(readers))
+            BodyKind::Fields(fields) => {
+                if !matches!(self.ct, ContentType::Application(Application::XWwwFormUrlencoded)) {
+                    return Ok(RawBodyReader::Data(RefReader::new_buf(StrCow::Owned(fields::object_json(fields)))));
                 }
+                let mut readers: RefReader<StrCow> = RefReader::default();
+                for (i, field) in fields.iter().enumerate() {
+                    if i > 0 { readers.add_str("&") }
+                    readers.add_str(&field.key);
+                    readers.add_str("=");
+                    match coder::url_encode(field.form_value()) {
+                        Cow::Borrowed(v) => readers.add_str(v),
+                        Cow::Owned(o) => readers.add_string(o)
+                    }
+                }
+                Ok(RawBodyReader::Data(readers))
             }
             BodyKind::Bytes(bytes) => Ok(RawBodyReader::Bytes(RefReader::new_buf(bytes.as_ref()))),
             BodyKind::Files(file) => Ok(RawBodyReader::File(file.as_reader()?)),

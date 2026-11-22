@@ -211,7 +211,7 @@ fn local_query_params() {
     let mut s = client();
     let url = SERVER
         .url("/echo")
-        .params(json::object! {"q" => "a b", "page" => 2})
+        .params([("q", "a b"), ("page", "2")])
         .unwrap();
     let resp = s.get(url, None).unwrap();
     assert_eq!(resp.status(), HttpStatus::OK);
@@ -231,9 +231,9 @@ fn local_request_headers() {
 #[test]
 fn local_post_json_body() {
     let mut s = client();
-    let body = json::object! {"a" => 1, "b" => "two"};
+    let body = body! {"a": 1, "b": "two"};
     let resp = s
-        .post(SERVER.url("/echo"), body.ty(Application::Json))
+        .post(SERVER.url("/echo"), body)
         .unwrap();
     assert_eq!(resp.status(), HttpStatus::OK);
     let body = resp.as_text().unwrap();
@@ -244,7 +244,7 @@ fn local_post_json_body() {
 #[test]
 fn local_post_form_body() {
     let mut s = client();
-    let form = json::object! {"a" => "1", "b" => "x y"};
+    let form = body! {"a": "1", "b": "x y"};
     let resp = s.post(SERVER.url("/echo"), form.form()).unwrap();
     let body = resp.as_text().unwrap();
     assert!(body.contains("body=a=1&b=x"), "body={}", body);

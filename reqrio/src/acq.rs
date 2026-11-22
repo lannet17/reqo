@@ -2,7 +2,6 @@ use crate::body::Body;
 use crate::error::HlsResult;
 use crate::ext::ReqPriExt;
 use crate::ext::{ReqExt, ReqUrl};
-use crate::json::JsonValue;
 use crate::stream::{ConnParam, HTTPStream, Proxy, SendParam, Stream, StreamMessage};
 use crate::*;
 use crate::tls::{ClientIdentity, TlsConnector, TlsSettings, TlsVersion};
@@ -254,6 +253,7 @@ impl AcReq {
     /// #### Send a request and validate errors, including body errors, then return JSON.
     /// 1. Send the request and validate the HTTP status code; return an error if it is not 200.
     /// 2. Compare the provided value using the supplied key, for example: {"code":200,..}; pass `k` as `code` and `v` as `200`. If it does not match, return an error.
+    #[cfg(feature = "serde")]
     pub async fn send_check_json<'a>(
         &mut self,
         method: Method,
@@ -262,7 +262,7 @@ impl AcReq {
         k: impl AsRef<str>,
         v: impl ToString,
         e: Vec<impl AsRef<str>>,
-    ) -> HlsResult<JsonValue> {
+    ) -> HlsResult<serde_json::Value> {
         let response = self.send_check(method, url, body).await?;
         self.check_res(response, k, v, e)
     }

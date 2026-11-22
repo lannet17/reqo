@@ -1,6 +1,6 @@
+#[cfg(feature = "serde")]
 use crate::error::HlsResult;
-use crate::{Header, Method, json};
-use reqrio_json::JsonValue;
+use crate::{Header, Method};
 use reqo_base::{ALPN, Buffer, Uri};
 use std::fmt::{Display, Formatter};
 use std::str::Utf8Error;
@@ -18,7 +18,11 @@ impl Request {
 
     pub fn header_mut(&mut self) -> &mut Header { &mut self.header }
 
-    pub fn json(self) -> HlsResult<JsonValue> { Ok(json::from_bytes(self.body.filled())?) }
+    /// Deserialize the body as JSON, e.g. `res.json::<MyStruct>()` or `res.json::<serde_json::Value>()`.
+    #[cfg(feature = "serde")]
+    pub fn json<T: serde::de::DeserializeOwned>(&self) -> HlsResult<T> {
+        serde_json::from_slice(self.body.filled()).map_err(|e| format!("json decode error: {}", e).into())
+    }
 
     pub fn as_text(&self) -> Result<&str, Utf8Error> { std::str::from_utf8(self.body.filled()) }
 

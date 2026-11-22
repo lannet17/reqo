@@ -2,7 +2,6 @@ use std::fmt::Write;
 use super::content_type::ContentType;
 use super::cookie::Cookie;
 use crate::cookie::CookieManager;
-use crate::json::JsonValue;
 use crate::*;
 pub use error::HeaderError;
 pub use key::HeaderItem;
@@ -431,12 +430,12 @@ impl Header {
         }
     }
 
-    pub fn set_by_json(&mut self, headers: JsonValue) {
-        for (k, v) in headers.into_entries() {
-            match k.as_str() {
-                "cookie" | "Cookie" => self.set_cookies(Cookie::from_req(v.dump())),
-                _ => self.insert(k, v.dump())
-            }
+    /// Insert every item of `other` (e.g. built with [`header!`](crate::header!)) into `self`,
+    /// replacing existing values with the same name.
+    pub fn merge(&mut self, other: Header) {
+        for item in other.inner {
+            let (name, value) = item.into_parts();
+            self.insert(name, value);
         }
     }
 
@@ -496,13 +495,13 @@ impl Display for Header {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Header, json};
+    use crate::{header, Header};
     use reqo_base::ALPN;
 
 
     #[test]
     fn test_header_order() {
-        let headers = json::object! {
+        let headers = || header! {
             "Connection": "keep-alive",
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 MicroMessenger/7.0.20.1781(0x6700143B) NetType/WIFI MiniProgramEnv/Windows WindowsWechat/WMPF WindowsWechat(0x63090a13) UnifiedPCWindowsWechat(0xf254181b) XWEB/20001",
             "Accept": "application/json",
@@ -517,7 +516,7 @@ mod tests {
             "Accept-Language": "zh-CN,zh;q=0.9",
         };
         let mut header = Header::default();
-        header.set_by_json(headers.clone());
+        header.merge(headers());
         header.insert("host", "xxxxx");
         header.insert("content-length", "748");
         header.insert("cookie", "wzws_sid=xxx");
@@ -542,7 +541,7 @@ Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.xxx.hKMvQpkzp5YpEN_B2
 
         let mut header = Header::default();
         header.init_by_alpn(ALPN::HTTP11);
-        header.set_by_json(headers);
+        header.merge(headers());
         header.insert("host", "xxxxx");
         header.insert("content-length", "748");
         header.insert("cookie", "wzws_sid=xxx");

@@ -2,7 +2,6 @@ use crate::error::HlsResult;
 use crate::packet::*;
 use crate::stream::{HTTPStream, Stream, StreamMessage};
 use crate::*;
-use json::JsonValue;
 use std::collections::HashMap;
 use std::sync::Arc;
 use crate::tls::{ClientIdentity, TlsConnector, TlsVersion};
@@ -117,13 +116,13 @@ pub trait ReqExt: Sized {
         *header = headers;
     }
 
-    fn set_headers_json(&mut self, headers: JsonValue) {
-        let header = ReqExt::header_mut(self);
-        header.set_by_json(headers)
+    /// Merge headers (e.g. from [`header!`](crate::header!)) into the session headers.
+    fn merge_headers(&mut self, headers: Header) {
+        ReqExt::header_mut(self).merge(headers)
     }
 
-    fn with_header_json(mut self, data: JsonValue) -> Self {
-        self.set_headers_json(data);
+    fn with_merged_headers(mut self, headers: Header) -> Self {
+        self.merge_headers(headers);
         self
     }
 
@@ -176,11 +175,13 @@ pub(crate) trait ReqPriExt: ReqExt {
         }
     }
 
-    fn check_res(&self, response: Response, k: impl AsRef<str>, v: impl ToString, e: Vec<impl AsRef<str>>) -> HlsResult<JsonValue> {
-        let data = response.json()?;
-        if data[k.as_ref()].to_string() != v.to_string() {
+    #[cfg(feature = "serde")]
+    fn check_res(&self, response: Response, k: impl AsRef<str>, v: impl ToString, e: Vec<impl AsRef<str>>) -> HlsResult<serde_json::Value> {
+        fn text(v: &serde_json::Value) -> String { v.as_str().map(str::to_string).unwrap_or_else(|| v.to_string()) }
+        let data: serde_json::Value = response.json()?;
+        if text(&data[k.as_ref()]) != v.to_string() {
             for e in e {
-                if !data[e.as_ref()].is_null() { return Err(data[e.as_ref()].to_string().into()); }
+                if !data[e.as_ref()].is_null() { return Err(text(&data[e.as_ref()]).into()); }
             }
             Err(format!("check fail: key: {}; value: {}", k.as_ref(), v.to_string()).into())
         } else { Ok(data) }
@@ -193,18 +194,16 @@ pub trait ReqStreamExt: ReqExt {
 }
 
 pub trait UrlExt {
-    fn params(&self, params: impl AsRef<JsonValue>) -> Result<Url, UrlError>;
+    /// Append query parameters: `"https://x/api".params([("q", "rust"), ("page", "2")])`.
+    fn params<K: ToString, V: ToString>(&self, params: impl IntoIterator<Item = (K, V)>) -> Result<Url, UrlError>;
     fn sni(&self, sni: impl Into<String>) -> Result<Url, UrlError>;
 }
 
 impl UrlExt for str {
-    fn params(&self, params: impl AsRef<JsonValue>) -> Result<Url, UrlError> {
+    fn params<K: ToString, V: ToString>(&self, params: impl IntoIterator<Item = (K, V)>) -> Result<Url, UrlError> {
         let mut url = Url::try_from(self)?;
-        for (key, value) in params.as_ref().entries() {
-            match value {
-                JsonValue::String(value) => url.uri_mut().insert_param(key, value),
-                _ => url.uri_mut().insert_param(key, value.dump())
-            }
+        for (key, value) in params {
+            url.uri_mut().insert_param(key, value.to_string());
         }
         Ok(url)
     }
@@ -215,7 +214,7 @@ impl UrlExt for str {
 }
 
 impl UrlExt for String {
-    fn params(&self, params: impl AsRef<JsonValue>) -> Result<Url, UrlError> {
+    fn params<K: ToString, V: ToString>(&self, params: impl IntoIterator<Item = (K, V)>) -> Result<Url, UrlError> {
         self.as_str().params(params)
     }
 

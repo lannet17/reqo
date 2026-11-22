@@ -1,7 +1,5 @@
 #[cfg(feature = "aync")]
 use std::io;
-use crate::error::HlsError;
-use crate::json::JsonValue;
 #[cfg(feature = "aync")]
 use std::pin::Pin;
 #[cfg(feature = "aync")]
@@ -164,29 +162,6 @@ impl Timeout {
     #[cfg(feature = "aync")]
     pub fn reset_connect(&mut self) {
         self.connect_time = Some(Box::pin(tokio::time::sleep(self.connect_timeout)));
-    }
-}
-
-impl TryFrom<JsonValue> for Timeout {
-    type Error = HlsError;
-    fn try_from(value: JsonValue) -> Result<Self, Self::Error> {
-        let connect = Duration::from_millis(value["connect"].as_u64()?);
-        let read = Duration::from_millis(value["read"].as_u64()?);
-        let write = Duration::from_millis(value["write"].as_u64()?);
-        Ok(Timeout {
-            #[cfg(feature = "aync")]
-            connect_time: None,
-            connect_timeout: connect,
-            #[cfg(feature = "aync")]
-            read_time: None,
-            read_timeout: read,
-            #[cfg(feature = "aync")]
-            write_time: None,
-            write_timeout: write,
-            handle: Duration::from_millis(value["handle"].as_u64()?),
-            connect_times: value["connect_times"].as_i32()?,
-            handle_times: value["handle_times"].as_i32()?,
-        })
     }
 }
 

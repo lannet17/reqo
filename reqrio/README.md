@@ -82,7 +82,7 @@ handshake constructor designed for browser-level ClientHello and TLS behavior bu
 ### TLS fingerprint examples
 
 ```rust
-use reqrio::*;
+use reqo::*;
 
 let fingerprint = Fingerprint::from_builtin("chrome-152") ?;
 let mut req = ScReq::new().with_fingerprint(fingerprint).with_alpn(ALPN::HTTP20);
@@ -91,7 +91,7 @@ let mut req = ScReq::new().with_fingerprint(fingerprint).with_alpn(ALPN::HTTP20)
 You can also build a custom fingerprint from a ClientHello payload:
 
 ```rust
-use reqrio::*;
+use reqo::*;
 
 let client_hello = hex::decode("...") ?;
 let mut req = ScReq::new().with_fingerprint(Fingerprint::from_client_hello(client_hello, "<token>") ? );
@@ -104,10 +104,10 @@ let mut req = ScReq::new().with_fingerprint(Fingerprint::from_client_hello(clien
 ### Initialize a Session
 
 ```rust
-use reqrio::*;
+use reqo::*;
 
 fn main() {
-    let headers = json::object! {
+    let headers = header! {
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
         "Accept-Encoding": "gzip, deflate, br, zstd",
         "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
@@ -121,7 +121,7 @@ fn main() {
 
     let mut req = ScReq::new()
         .with_alpn(ALPN::HTTP20)
-        .with_header_json(headers).unwrap()
+        .with_header(headers).unwrap()
         .with_timeout(Timeout::new_same(3000, 3));
 }
 ```
@@ -129,7 +129,7 @@ fn main() {
 ### GET Request Example
 
 ```rust
-use reqrio::*;
+use reqo::*;
 
 fn main() {
     let mut req = ScReq::new();
@@ -143,14 +143,14 @@ fn main() {
 ### Form POST
 
 ```rust
-use reqrio::*;
+use reqo::*;
 
 fn main() {
     let mut req = ScReq::new();
     let url = "https://www.baidu.com/api";
-    let data = json::object! {
+    let data = body! {
         "field1": "value1",
-        "field2": "value2"
+        "field2": 2
     };
     let resp = req.post(url, data.form()).unwrap();
 }
@@ -159,14 +159,14 @@ fn main() {
 ### JSON POST
 
 ```rust
-use reqrio::*;
+use reqo::*;
 
 fn main() {
     let mut req = ScReq::new();
     let url = "https://www.baidu.com/api";
-    let data = json::object! {
+    let data = body! {
         "field1": "value1",
-        "field2": "value2"
+        "field2": { "nested": [1, 2, 3] }
     };
     let resp = req.post(url, data).unwrap();
 }
@@ -177,7 +177,7 @@ fn main() {
 > Requires the `serde` feature
 
 ```rust
-use reqrio::*;
+use reqo::*;
 use serde::Serialize;
 
 fn main() {
@@ -198,7 +198,7 @@ fn main() {
 ## 🔌 WebSocket Support
 
 ```rust
-use reqrio::*;
+use reqo::*;
 
 fn main() {
     let mut ws = WebSocket::open_sync("wss://echo.websocket.org").unwrap();

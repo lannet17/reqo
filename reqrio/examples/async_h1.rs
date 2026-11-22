@@ -24,7 +24,7 @@ async fn main() {
     let mut timeout = Timeout::longer();
     timeout.set_handle_times(1);
 
-    let headers = json::object! {
+    let headers = header! {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0",
         "Accept": "*/*",
         "Sec-Fetch-Site": "none",
@@ -51,7 +51,7 @@ async fn main() {
         .with_auto_redirect(false)
         // .with_proxy(Proxy::Null)
         .with_alpn(ALPN::HTTP20)
-        .with_header_json(headers)
+        .with_merged_headers(headers)
         // .with_mtls(vec![], RsaKey::none(), Some(vec![cert]))
         // .with_proxy(Proxy::try_from("http://180.117.50.133:3828").unwrap())
         // .with_mtls(certs, key)
