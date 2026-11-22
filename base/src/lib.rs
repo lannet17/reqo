@@ -1,8 +1,5 @@
-//! Pure-Rust building blocks shared by `reqrio` and its TLS backends:
-//! byte buffers, URL types, ALPN, content coding, and small hash/encoding helpers.
-//!
-//! This crate deliberately has no TLS code and no native (FFI) dependencies,
-//! so a TLS backend crate can depend on it without pulling in reqrio itself.
+//! Types used by [reqo](https://crates.io/crates/reqo): byte buffers, URLs,
+//! ALPN, gzip/deflate/brotli/zstd coding, md5 and base64 helpers.
 
 mod alpn;
 mod buffer;

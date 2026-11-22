@@ -1,68 +1,56 @@
 # reqo
 
-[English](README.md)
+[English](https://github.com/lannet17/reqo/blob/main/README.md)
 
-**reqo** 是一个轻量的 Rust HTTP 客户端，**TLS 层可插拔**。
-它支持 HTTP/1.1 和 HTTP/2，同时提供同步和异步两套会话，请求头严格按照你写的顺序发送，
-HTTP/2 的连接参数也可以自定义。默认使用 rustls 处理 TLS，实现一个 trait 就能换成任何其他 TLS 实现。
+Rust 的 HTTP/1.1、HTTP/2 客户端，有同步和异步两套接口。请求头按设置的顺序发送，
+HTTP/2 的 SETTINGS 可以改，TLS 通过 trait 接入（默认 rustls），可以换成别的实现。
 
 ```toml
 [dependencies]
 reqo = "0.5"
 ```
 
-## 特性
-
-- **同步 + 异步**：`reqo::Session`（阻塞）和 `reqo::aio::Session`（基于 tokio，需开启 `aync` feature）API 一致。
-- **HTTP/1.1 和 HTTP/2**：通过 ALPN 协商，支持流水线请求（`send` / `recv`）和流式响应。
-- **请求头保序**：严格按书写顺序发送；各协议的默认顺序参照真实浏览器。
-- **HTTP/2 指纹**：SETTINGS / WINDOW_UPDATE 帧和流优先级都可以配置。
-- **可插拔 TLS**：默认 rustls（支持 mTLS、TLS 1.2/1.3、会话恢复、key log），也可以接入自己的 `TlsConnector`。
-- **轻量宏**：`body!` 构造 JSON / 表单请求体，`header!` 构造请求头，只依赖标准库类型。
-- **自动解码**：自动解压 gzip、deflate、brotli、zstd 响应，包括 chunked 传输。
-- **代理**：HTTP CONNECT 和 SOCKS5，支持认证。
-- **WebSocket** 客户端（同步 / 异步），支持 permessage-deflate。
-- **纯 Rust 核心**：没有 FFI，编译时不需要下载任何东西。
-
-## 快速开始
+## 示例
 
 ```rust,no_run
 use reqo::*;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // 一次性请求
     let res = reqo::get("https://httpbin.org/get", None)?;
     println!("{} {}", res.status(), res.as_text()?);
 
-    // 可复用的会话：保持连接、cookie 和请求头
-    let mut req = Session::new()
-        .with_alpn(ALPN::HTTP20)                    // 优先 h2，不支持时回落到 http/1.1
-        .with_timeout(Timeout::new_same(5000, 3))   // 超时 5 秒，最多尝试 3 次
+    let mut s = Session::new()
+        .with_alpn(ALPN::HTTP20)
+        .with_timeout(Timeout::new_same(5000, 3))
         .with_header(header! {
             "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
             "accept": "*/*",
             "accept-encoding": "gzip, deflate, br, zstd",
         });
 
-    let res = req.post("https://httpbin.org/post", body! { "name": "reqo", "page": 2 })?;
+    let res = s.post("https://httpbin.org/post", body! { "name": "reqo", "page": 2 })?;
     println!("{}", res.as_text()?);
     Ok(())
 }
 ```
 
-异步用法相同，换成 `aio::Session` 并加上 `.await`（需开启 `aync` feature）：
+`Timeout::new_same(5000, 3)`：连接、读、写超时都是 5 秒；建立连接最多尝试 3 次，每个请求也最多尝试 3 次。
+
+异步要开 `aync` feature，方法一样，类型在 `reqo::aio` 下：
 
 ```rust,ignore
 use reqo::*;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut req = aio::Session::new().with_alpn(ALPN::HTTP20);
-    let res = req.get("https://httpbin.org/get", None).await?;
+    let mut s = aio::Session::new();
+    let res = s.get("https://httpbin.org/get", None).await?;
     println!("{}", res.as_text()?);
     Ok(())
 }
 ```
+
+一个 `Session` 对应一条连接，连同这条连接上的请求头和 cookie。它不是连接池，需要多条连接就建多个 `Session`。
 
 ## 请求体
 
@@ -71,7 +59,7 @@ use reqo::*;
 
 let name = "reqo";
 
-// 默认是 JSON：支持嵌套对象、数组和 null
+// JSON
 let json = body! {
     "name": name,
     page: 2,
@@ -79,74 +67,72 @@ let json = body! {
     "extra": { "debug": true, "proxy": null },
 };
 
-// 同样的字段，以 application/x-www-form-urlencoded 发送
+// 同样的字段，按 application/x-www-form-urlencoded 发送
 let form = body! { "name": name, "page": 2 }.form();
 
-// 纯文本和原始字节
 let text = Body::from("hello");
 let bytes = Body::from(vec![1u8, 2, 3]);
 
-// multipart 上传：表单字段 + 文件
-let mut file = HttpFile::new_bytes_data([("desc", "avatar")], b"...png bytes...".to_vec());
+// multipart
+let mut file = HttpFile::new_bytes_data([("desc", "avatar")], b"...".to_vec());
 file.add_form(FileForm::new_bytes(b"second file".to_vec()).with_field_name("file2"));
 let multipart = Body::from(file);
 ```
 
-`body!` 中的值可以是任意标准库类型：数字、`bool`、`&str` / `String`、`Option`、`Vec`、
-数组、`HashMap` / `BTreeMap`。自定义类型可以实现 `ToJson`，或在开启 `serde` feature 后使用 `Body::json(&value)`。
+`body!` 里的值可以是数字、`bool`、字符串、`Option`、`Vec`、数组和以字符串为键的 map。
+其他类型要实现 `ToJson`，或者开 `serde` feature 用 `Body::json(&v)`。
 
 ## 响应
 
 ```rust,ignore
-let res = req.get("https://httpbin.org/json", None)?;
-res.status();          // HttpStatus
-res.header();          // &Header
-res.as_text()?;        // &str
-res.as_bytes();        // &[u8]
+let res = s.get("https://httpbin.org/json", None)?;
+res.status();
+res.header();
+res.as_text()?;
+res.as_bytes();
 
-// 开启 `serde` feature 后
-let doc: serde_json::Value = res.json()?;
-let typed: MyStruct = res.json()?;
+// serde feature
+let v: serde_json::Value = res.json()?;
+let data: MyStruct = res.json()?;
 ```
 
-## 查询参数、流水线、流式响应
+## 查询参数、流水线、分块读取
 
 ```rust,no_run
 # use reqo::*;
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
-# let mut req = Session::new();
-// 查询参数
+# let mut s = Session::new();
 let url = "https://httpbin.org/get".params([("q", "rust"), ("page", "2")])?;
-let res = req.get(url, None)?;
+let res = s.get(url, None)?;
 
-// 流水线：先连续发送多个请求，再依次取回响应
-let a = req.send(Method::GET, "https://httpbin.org/uuid", None)?;
-let b = req.send(Method::GET, "https://httpbin.org/ip", None)?;
-let (ra, rb) = (req.recv(a)?, req.recv(b)?);
+// 先发，后收
+let a = s.send(Method::GET, "https://httpbin.org/uuid", None)?;
+let b = s.send(Method::GET, "https://httpbin.org/ip", None)?;
+let (ra, rb) = (s.recv(a)?, s.recv(b)?);
 
-// 流式响应：先拿到响应头，再逐块读取响应体
-let head = req.send_stream(Method::GET, "https://httpbin.org/stream/20", None)?;
-let sid = head.sid;
-while let Some(chunk) = req.next_chunk(sid)? {
+// 一块一块读响应体
+let sid = s.send_stream(Method::GET, "https://httpbin.org/stream/20", None)?.sid;
+while let Some(chunk) = s.next_chunk(sid)? {
     println!("{} bytes", chunk.len());
 }
 # Ok(())
 # }
 ```
 
-## 请求头与 HTTP/2 指纹
+## 请求头
 
-请求头严格按插入顺序发送。`header!` 构造一个 `Header`；`merge_headers` 把请求头合并进会话，
-不会清掉已有的请求头：
+`header!` 保持书写顺序。`merge_headers` 在会话已有的请求头上追加，`with_header` 是整个替换。
 
 ```rust,no_run
 # use reqo::*;
-# let mut req = Session::new();
-req.merge_headers(header! { "x-trace": 42, "cookie": "a=1; b=2" });
-req.insert_header("x-late", "late");
+# let mut s = Session::new();
+s.merge_headers(header! { "x-trace": 42, "cookie": "a=1; b=2" });
+s.insert_header("x-late", "late");
 ```
 
-HTTP/2 连接前言之后发送的帧可以自定义：
+## HTTP/2 设置
+
+连接前言之后发送的帧：
 
 ```rust
 use reqo::*;
@@ -164,32 +150,28 @@ let h2 = H2Finger {
     weight: 255,
     priority: true,
 };
-let req = Session::new().with_fingerprint(Fingerprint::new_h2(h2));
+let s = Session::new().with_fingerprint(Fingerprint::new_h2(h2));
 ```
 
 ## TLS
 
-reqo 自己不做 TLS 握手。它把（可能经过代理的）连接交给一个 `TlsConnector`，拿回加密后的流。
-
-**默认：rustls**（`rustls` feature，默认开启）
+默认的 `rustls` feature 下：
 
 ```rust,no_run
 use reqo::*;
 
-let identity = ClientIdentity::from_pem_files("client.pem", "client.key")?;
-let req = Session::new()
-    .with_version(TlsVersion::Tls13)            // 最高提供的 TLS 版本
-    .with_mtls(identity, None)                  // 客户端证书（mTLS）
-    .with_key_log("keys.log");                  // 导出 NSS key log 供 Wireshark 解密（仅限调试）
+let id = ClientIdentity::from_pem_files("client.pem", "client.key")?;
+let s = Session::new()
+    .with_version(TlsVersion::Tls13)  // 最高版本
+    .with_mtls(id, None)
+    .with_key_log("keys.log");
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-- 根证书使用 Mozilla 根证书集（`webpki-roots`）。`SSL_CERT_FILE` 指向的 PEM 文件中的证书也会被信任，
-  还可以用 `RustlsConnector::with_extra_roots_pem` 追加。
-- `with_verify(false)` 会跳过证书校验，只应在测试中使用。
-- 会话票据按配置缓存，后续连接会自动恢复会话。
+- 信任的根证书：`webpki-roots`，加上 `SSL_CERT_FILE` 里的证书，再加上 `RustlsConnector::with_extra_roots_pem` 添加的。
+- `with_verify(false)` 关闭证书校验。
 
-**接入自己的 TLS 实现**：实现 `reqo::tls::TlsConnector`，并关闭默认的 `rustls` feature，避免把 rustls 编译进来：
+要换别的 TLS 库，实现 `reqo::tls::TlsConnector`，并且不编译 rustls：
 
 ```toml
 reqo = { version = "0.5", default-features = false, features = ["zstd"] }
@@ -199,30 +181,28 @@ reqo = { version = "0.5", default-features = false, features = ["zstd"] }
 use reqo::tls::{SyncIo, TlsConnector, TlsIo, TlsOptions};
 use reqo::HlsResult;
 
-struct MyConnector;
+struct MyTls;
 
-impl TlsConnector for MyConnector {
+impl TlsConnector for MyTls {
     fn connect(&self, io: Box<dyn SyncIo>, opts: &TlsOptions<'_>) -> HlsResult<Box<dyn TlsIo>> {
-        // 在 `io` 上针对 `opts.server_name` 完成握手，提供 `opts.alpn` 中的协议，
-        // 然后返回一个能报告协商结果（ALPN）的流。
+        // 在 io 上和 opts.server_name 握手，ALPN 用 opts.alpn
         todo!()
     }
-    // 开启 `aync` feature 时，还需要实现 `connect_async`。
+    // 开了 aync 还要实现 connect_async
 }
 
-let req = Session::new().with_tls_connector(std::sync::Arc::new(MyConnector));
+let s = Session::new().with_tls_connector(std::sync::Arc::new(MyTls));
 ```
 
-`TlsOptions` 会传入服务器名、ALPN 列表、是否校验证书、最高版本、客户端证书、CA 证书和 key log 路径。
-后端可以忽略自己不支持的选项，也可以在自己的 connector 类型上提供额外配置（比如 ClientHello 指纹）。
+`io` 是 TCP 连接，设置了代理的话已经走完代理握手。
 
-## 代理与 WebSocket
+## 代理、WebSocket
 
 ```rust,no_run
 # use reqo::*;
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
-let req = Session::new().with_proxy(Proxy::try_from("socks5://user:pass@127.0.0.1:1080")?);
-let req = Session::new().with_proxy(Proxy::try_from("http://127.0.0.1:8080")?);
+let s = Session::new().with_proxy(Proxy::try_from("socks5://user:pass@127.0.0.1:1080")?);
+let s = Session::new().with_proxy(Proxy::try_from("http://127.0.0.1:8080")?);
 
 let mut ws = WebSocket::open_sync("wss://echo.websocket.org")?;
 ws.send_text("hello").wait()?;
@@ -231,29 +211,18 @@ let frame = ws.read_frame().wait()?;
 # }
 ```
 
-## Feature 列表
+## Features
 
-| Feature  | 默认 | 说明                                                   |
-|----------|:----:|--------------------------------------------------------|
-| `rustls` |  是  | 默认 TLS 后端（rustls + ring + webpki-roots）          |
-| `zstd`   |  是  | zstd 解码（libzstd 由 `cc` 从源码编译）                |
-| `aync`   |      | 基于 tokio 的异步 API（`aio::Session`、异步 WebSocket）       |
-| `serde`  |      | `Response::json::<T>()`、`Body::json(&T)`、serde 派生  |
-| `log`    |      | 通过 `log` crate 输出内部日志                          |
+| Feature  | 默认 | |
+|----------|:----:|---|
+| `rustls` | 是   | 用 rustls（ring、webpki-roots）做 TLS |
+| `zstd`   | 是   | zstd 解码，用 `cc` 编译 libzstd |
+| `aync`   |      | `reqo::aio`，基于 tokio |
+| `serde`  |      | `Response::json`、`Body::json` |
+| `log`    |      | 通过 `log` 输出日志 |
 
-可插拔 TLS 层暂时还不支持 HTTP/3（QUIC）。
+gzip、deflate、brotli 解码始终可用。暂不支持 HTTP/3。
 
-## Crate
+## License
 
-| Crate       | 说明                                                         |
-|-------------|--------------------------------------------------------------|
-| `reqo`      | HTTP 客户端本体                                              |
-| `reqo-base` | 缓冲区、URL 类型、ALPN 和内容编解码，供 TLS 后端 crate 共用  |
-
-## 致谢
-
-reqo fork 自 [reqrio](https://github.com/xllgl2017/reqrio) 0.4.2。
-
-## 许可证
-
-Apache-2.0，见 [LICENSE-APACHE](LICENSE-APACHE)。
+Apache-2.0。fork 自 [reqrio](https://github.com/xllgl2017/reqrio) 0.4.2。

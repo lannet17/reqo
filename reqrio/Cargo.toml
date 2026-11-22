@@ -3,7 +3,7 @@ name = "reqo"
 version = "0.5.0"
 edition = "2024"
 readme = "../README.md"
-description = "A lightweight, high-performance HTTP request library with pluggable TLS backends (rustls by default)."
+description = "HTTP/1.1 and HTTP/2 client with ordered headers and replaceable TLS (rustls by default)"
 license-file = "../LICENSE-APACHE"
 repository = "https://github.com/lannet17/reqo"
 

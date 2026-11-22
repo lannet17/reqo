@@ -1,21 +1,12 @@
-//! Pluggable TLS layer.
+//! TLS backends.
 //!
-//! reqrio itself never performs a TLS handshake. It hands an already-connected
-//! (and, if configured, proxied) byte stream to a [`TlsConnector`], and gets back
-//! an encrypted stream plus the negotiated ALPN.
+//! A session connects TCP (and the proxy, if set), then calls
+//! [`TlsConnector::connect`] / `connect_async` with that stream and gets back a
+//! [`TlsIo`] / `AsyncTlsIo`. The negotiated ALPN decides between HTTP/1.1 and HTTP/2.
 //!
-//! * With the default `rustls` feature, [`RustlsConnector`] is used automatically.
-//! * Any other backend (e.g. a private fingerprinting implementation) only needs
-//!   to implement [`TlsConnector`] and be installed with
-//!   [`ReqExt::set_tls_connector`](crate::ReqExt::set_tls_connector).
-//!
-//! ```ignore
-//! struct MyConnector;
-//! impl reqo::tls::TlsConnector for MyConnector {
-//!     fn connect(&self, io: Box<dyn SyncIo>, opts: &TlsOptions<'_>) -> HlsResult<Box<dyn TlsIo>> { ... }
-//! }
-//! let req = Session::new().with_tls_connector(Arc::new(MyConnector));
-//! ```
+//! The `rustls` feature provides `RustlsConnector`, which is used when no
+//! connector is set. Set another one with
+//! [`ReqExt::set_tls_connector`](crate::ReqExt::set_tls_connector).
 
 #[cfg(feature = "rustls")]
 mod rustls_backend;

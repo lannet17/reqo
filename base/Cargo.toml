@@ -2,7 +2,7 @@
 name = "reqo-base"
 version = "0.5.0"
 edition = "2024"
-description = "Pure-Rust building blocks (buffers, URL, content coding) shared by reqo and its TLS backends."
+description = "Buffers, URL and content-coding types used by reqo"
 license-file = "../LICENSE-APACHE"
 repository = "https://github.com/lannet17/reqo"
 

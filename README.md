@@ -1,79 +1,67 @@
 # reqo
 
-[中文](README_zh.md)
+[中文](https://github.com/lannet17/reqo/blob/main/README_zh.md)
 
-**reqo** is a lightweight HTTP client for Rust with a **pluggable TLS layer**.
-It speaks HTTP/1.1 and HTTP/2, has both blocking and async sessions, keeps
-request headers in exactly the order you write them, and lets you control the
-HTTP/2 connection settings. TLS is handled by rustls out of the box, and you can
-swap in any other TLS stack by implementing a single trait.
+HTTP/1.1 and HTTP/2 client for Rust, sync and async. Headers go out in the
+order you set them, HTTP/2 settings can be changed, and TLS goes through a
+trait (rustls by default) so it can be replaced.
 
 ```toml
 [dependencies]
 reqo = "0.5"
 ```
 
-## Highlights
-
-- **Sync and async**: `reqo::Session` (blocking) and `reqo::aio::Session` (tokio, `aync` feature) share the same API.
-- **HTTP/1.1 and HTTP/2**, negotiated through ALPN, with pipelining (`send` / `recv`) and streaming responses.
-- **Header order is preserved** exactly as written; per-protocol default orders follow real browsers.
-- **HTTP/2 fingerprint**: SETTINGS / WINDOW_UPDATE frames and stream priority are configurable.
-- **Pluggable TLS**: rustls by default (mTLS, TLS 1.2/1.3, session resumption, key log), or your own `TlsConnector`.
-- **Small macro layer**: `body!` for JSON / form bodies and `header!` for headers, built on std types only.
-- **Content decoding**: gzip, deflate, brotli and zstd responses are decoded automatically, including chunked transfer.
-- **Proxies**: HTTP CONNECT and SOCKS5, with or without authentication.
-- **WebSocket** client (sync and async), with permessage-deflate support.
-- **Pure Rust core**: no FFI and nothing downloaded at build time.
-
-## Quick start
+## Example
 
 ```rust,no_run
 use reqo::*;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // One-off request
     let res = reqo::get("https://httpbin.org/get", None)?;
     println!("{} {}", res.status(), res.as_text()?);
 
-    // Reusable session: keeps the connection, cookies and headers
-    let mut req = Session::new()
-        .with_alpn(ALPN::HTTP20)                    // offer h2, fall back to http/1.1
-        .with_timeout(Timeout::new_same(5000, 3))   // 5s timeouts, up to 3 attempts
+    let mut s = Session::new()
+        .with_alpn(ALPN::HTTP20)
+        .with_timeout(Timeout::new_same(5000, 3))
         .with_header(header! {
             "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
             "accept": "*/*",
             "accept-encoding": "gzip, deflate, br, zstd",
         });
 
-    let res = req.post("https://httpbin.org/post", body! { "name": "reqo", "page": 2 })?;
+    let res = s.post("https://httpbin.org/post", body! { "name": "reqo", "page": 2 })?;
     println!("{}", res.as_text()?);
     Ok(())
 }
 ```
 
-Async works the same way with `aio::Session` and `.await` (enable the `aync` feature):
+`Timeout::new_same(5000, 3)`: 5 s for connect, read and write; at most 3 attempts to connect and 3 per request.
+
+Async needs the `aync` feature. Same methods, from `reqo::aio`:
 
 ```rust,ignore
 use reqo::*;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut req = aio::Session::new().with_alpn(ALPN::HTTP20);
-    let res = req.get("https://httpbin.org/get", None).await?;
+    let mut s = aio::Session::new();
+    let res = s.get("https://httpbin.org/get", None).await?;
     println!("{}", res.as_text()?);
     Ok(())
 }
 ```
 
-## Request bodies
+A `Session` holds one connection plus its headers and cookies. Use one session
+per connection; it is not a pool.
+
+## Bodies
 
 ```rust
 use reqo::*;
 
 let name = "reqo";
 
-// JSON (default): nested objects, arrays and null are supported
+// JSON
 let json = body! {
     "name": name,
     page: 2,
@@ -81,76 +69,74 @@ let json = body! {
     "extra": { "debug": true, "proxy": null },
 };
 
-// The same fields as application/x-www-form-urlencoded
+// same fields, sent as application/x-www-form-urlencoded
 let form = body! { "name": name, "page": 2 }.form();
 
-// Plain text and raw bytes
 let text = Body::from("hello");
 let bytes = Body::from(vec![1u8, 2, 3]);
 
-// Multipart upload: form fields + files
-let mut file = HttpFile::new_bytes_data([("desc", "avatar")], b"...png bytes...".to_vec());
+// multipart
+let mut file = HttpFile::new_bytes_data([("desc", "avatar")], b"...".to_vec());
 file.add_form(FileForm::new_bytes(b"second file".to_vec()).with_field_name("file2"));
 let multipart = Body::from(file);
 ```
 
-Values in `body!` can be any std type: numbers, `bool`, `&str` / `String`,
-`Option`, `Vec`, arrays, `HashMap` / `BTreeMap`. For your own types, implement
-`ToJson`, or use `Body::json(&value)` with the `serde` feature.
+Values in `body!` can be numbers, `bool`, strings, `Option`, `Vec`, arrays and
+string-keyed maps. Other types need a `ToJson` impl, or use `Body::json(&v)`
+with the `serde` feature.
 
 ## Responses
 
 ```rust,ignore
-let res = req.get("https://httpbin.org/json", None)?;
-res.status();          // HttpStatus
-res.header();          // &Header
-res.as_text()?;        // &str
-res.as_bytes();        // &[u8]
+let res = s.get("https://httpbin.org/json", None)?;
+res.status();
+res.header();
+res.as_text()?;
+res.as_bytes();
 
-// With the `serde` feature
-let doc: serde_json::Value = res.json()?;
-let typed: MyStruct = res.json()?;
+// serde feature
+let v: serde_json::Value = res.json()?;
+let data: MyStruct = res.json()?;
 ```
 
-## Query parameters, pipelining, streaming
+## Query, pipelining, streaming
 
 ```rust,no_run
 # use reqo::*;
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
-# let mut req = Session::new();
-// Query parameters
+# let mut s = Session::new();
 let url = "https://httpbin.org/get".params([("q", "rust"), ("page", "2")])?;
-let res = req.get(url, None)?;
+let res = s.get(url, None)?;
 
-// Pipelining: send several requests, then collect the responses
-let a = req.send(Method::GET, "https://httpbin.org/uuid", None)?;
-let b = req.send(Method::GET, "https://httpbin.org/ip", None)?;
-let (ra, rb) = (req.recv(a)?, req.recv(b)?);
+// send first, read later
+let a = s.send(Method::GET, "https://httpbin.org/uuid", None)?;
+let b = s.send(Method::GET, "https://httpbin.org/ip", None)?;
+let (ra, rb) = (s.recv(a)?, s.recv(b)?);
 
-// Streaming: headers first, then the body chunk by chunk
-let head = req.send_stream(Method::GET, "https://httpbin.org/stream/20", None)?;
-let sid = head.sid;
-while let Some(chunk) = req.next_chunk(sid)? {
+// read the body chunk by chunk
+let sid = s.send_stream(Method::GET, "https://httpbin.org/stream/20", None)?.sid;
+while let Some(chunk) = s.next_chunk(sid)? {
     println!("{} bytes", chunk.len());
 }
 # Ok(())
 # }
 ```
 
-## Headers and HTTP/2 fingerprint
+## Headers
 
-Headers are sent in exactly the order you insert them. `header!` builds a
-`Header`, and `merge_headers` adds headers to a session without replacing the
-existing ones:
+`header!` keeps the order you write. `merge_headers` adds to what the session
+already has; `with_header` replaces it.
 
 ```rust,no_run
 # use reqo::*;
-# let mut req = Session::new();
-req.merge_headers(header! { "x-trace": 42, "cookie": "a=1; b=2" });
-req.insert_header("x-late", "late");
+# let mut s = Session::new();
+s.merge_headers(header! { "x-trace": 42, "cookie": "a=1; b=2" });
+s.insert_header("x-late", "late");
 ```
 
-The frames sent right after the HTTP/2 preface are configurable:
+## HTTP/2 settings
+
+Frames sent after the connection preface:
 
 ```rust
 use reqo::*;
@@ -168,34 +154,29 @@ let h2 = H2Finger {
     weight: 255,
     priority: true,
 };
-let req = Session::new().with_fingerprint(Fingerprint::new_h2(h2));
+let s = Session::new().with_fingerprint(Fingerprint::new_h2(h2));
 ```
 
 ## TLS
 
-reqo never performs a TLS handshake itself. It hands the (possibly proxied)
-connection to a `TlsConnector` and gets an encrypted stream back.
-
-**Default: rustls** (`rustls` feature, enabled by default)
+With the default `rustls` feature:
 
 ```rust,no_run
 use reqo::*;
 
-let identity = ClientIdentity::from_pem_files("client.pem", "client.key")?;
-let req = Session::new()
-    .with_version(TlsVersion::Tls13)            // highest version to offer
-    .with_mtls(identity, None)                  // client certificate (mTLS)
-    .with_key_log("keys.log");                  // NSS key log for Wireshark (debugging only)
+let id = ClientIdentity::from_pem_files("client.pem", "client.key")?;
+let s = Session::new()
+    .with_version(TlsVersion::Tls13)  // max version offered
+    .with_mtls(id, None)
+    .with_key_log("keys.log");
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-- Roots come from the Mozilla set (`webpki-roots`). Certificates in the PEM file
-  named by `SSL_CERT_FILE` are trusted as well, and `RustlsConnector::with_extra_roots_pem` adds more.
-- `with_verify(false)` skips certificate validation. Use it only for testing.
-- Session tickets are cached per configuration, so later connections resume automatically.
+- Trusted roots: `webpki-roots`, plus anything in `SSL_CERT_FILE`, plus `RustlsConnector::with_extra_roots_pem`.
+- `with_verify(false)` turns off certificate checks.
 
-**Your own TLS stack**: implement `reqo::tls::TlsConnector`, then disable the
-default `rustls` feature so rustls isn't compiled in:
+To use a different TLS library, implement `reqo::tls::TlsConnector` and build
+without rustls:
 
 ```toml
 reqo = { version = "0.5", default-features = false, features = ["zstd"] }
@@ -205,32 +186,28 @@ reqo = { version = "0.5", default-features = false, features = ["zstd"] }
 use reqo::tls::{SyncIo, TlsConnector, TlsIo, TlsOptions};
 use reqo::HlsResult;
 
-struct MyConnector;
+struct MyTls;
 
-impl TlsConnector for MyConnector {
+impl TlsConnector for MyTls {
     fn connect(&self, io: Box<dyn SyncIo>, opts: &TlsOptions<'_>) -> HlsResult<Box<dyn TlsIo>> {
-        // Handshake over `io` for `opts.server_name`, offering `opts.alpn`,
-        // then return a stream that reports the negotiated ALPN.
+        // handshake on `io` for opts.server_name, offer opts.alpn
         todo!()
     }
-    // With the `aync` feature, also override `connect_async`.
+    // also connect_async with the `aync` feature
 }
 
-let req = Session::new().with_tls_connector(std::sync::Arc::new(MyConnector));
+let s = Session::new().with_tls_connector(std::sync::Arc::new(MyTls));
 ```
 
-`TlsOptions` passes the server name, the ALPN list, verify mode, maximum
-version, client identity, CA bundle and key-log path. A backend is free to
-ignore what it doesn't support, or to add its own settings (such as a
-ClientHello fingerprint) on its connector type.
+`io` is the TCP stream, already through the proxy if one is set.
 
-## Proxies and WebSocket
+## Proxy, WebSocket
 
 ```rust,no_run
 # use reqo::*;
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
-let req = Session::new().with_proxy(Proxy::try_from("socks5://user:pass@127.0.0.1:1080")?);
-let req = Session::new().with_proxy(Proxy::try_from("http://127.0.0.1:8080")?);
+let s = Session::new().with_proxy(Proxy::try_from("socks5://user:pass@127.0.0.1:1080")?);
+let s = Session::new().with_proxy(Proxy::try_from("http://127.0.0.1:8080")?);
 
 let mut ws = WebSocket::open_sync("wss://echo.websocket.org")?;
 ws.send_text("hello").wait()?;
@@ -239,29 +216,18 @@ let frame = ws.read_frame().wait()?;
 # }
 ```
 
-## Feature flags
+## Features
 
-| Feature  | Default | Description                                                       |
-|----------|:-------:|-------------------------------------------------------------------|
-| `rustls` |   yes   | Default TLS backend (rustls + ring + webpki-roots)                |
-| `zstd`   |   yes   | zstd content decoding (libzstd is compiled from source by `cc`)   |
-| `aync`   |         | Async API (`aio::Session`, async WebSocket) on tokio                     |
-| `serde`  |         | `Response::json::<T>()`, `Body::json(&T)`, serde derives          |
-| `log`    |         | Internal logging through the `log` crate                          |
+| Feature  | Default | |
+|----------|:-------:|---|
+| `rustls` | yes     | rustls (ring, webpki-roots) as the TLS backend |
+| `zstd`   | yes     | zstd decoding; builds libzstd with `cc` |
+| `aync`   |         | `reqo::aio`, tokio |
+| `serde`  |         | `Response::json`, `Body::json` |
+| `log`    |         | logging via `log` |
 
-HTTP/3 (QUIC) is not available yet with the pluggable TLS layer.
-
-## Crates
-
-| Crate       | Description                                                                 |
-|-------------|-----------------------------------------------------------------------------|
-| `reqo`      | The HTTP client                                                             |
-| `reqo-base` | Buffers, URL types, ALPN and content coding, shared with TLS backend crates |
-
-## Acknowledgements
-
-reqo is a fork of [reqrio](https://github.com/xllgl2017/reqrio) 0.4.2.
+gzip, deflate and brotli decoding are always on. HTTP/3 isn't supported yet.
 
 ## License
 
-Apache-2.0. See [LICENSE-APACHE](LICENSE-APACHE).
+Apache-2.0. Forked from [reqrio](https://github.com/xllgl2017/reqrio) 0.4.2.
