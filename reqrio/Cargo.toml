@@ -29,6 +29,19 @@ required-features = ["serde"]
 name = "async_http_test"
 required-features = ["aync", "serde"]
 
+# Shared modules of the tests above (Cargo also builds them as their own targets).
+[[test]]
+name = "sync_http"
+required-features = ["serde"]
+
+[[test]]
+name = "async_http"
+required-features = ["aync", "serde"]
+
+[[example]]
+name = "async_h1"
+required-features = ["aync"]
+
 [features]
 default = ["rustls", "zstd"]
 # `Response::json::<T>()`, `Body::json(&T)` and serde derives.

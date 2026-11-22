@@ -1,6 +1,6 @@
 #[cfg(feature = "serde")]
 use reqo::Body;
-use reqo::{Application, ContentType, FileForm, HttpFile, HttpStatus, ImageType, Method, ReqExt, ScReq, Text, UrlExt, body, header};
+use reqo::{Application, ContentType, FileForm, HttpFile, HttpStatus, ImageType, Method, ReqExt, Session, Text, UrlExt, body, header};
 use reqo::{ALPN, base64, coder, rand};
 use serde_json::Value;
 
@@ -25,7 +25,7 @@ pub fn fv(body: &Body, key: &str) -> String {
 
 
 ///Testing different types of requests
-pub fn http_get_matrix(req: &mut ScReq, alpn: ALPN) {
+pub fn http_get_matrix(req: &mut Session, alpn: ALPN) {
     let mut sids = vec![
         req.send(Method::GET, "https://httpbin.reqrio.com", None).unwrap(),                // 0 首页
         req.send(Method::GET, "https://httpbin.reqrio.com/get", None).unwrap(),            // 1 查询串回显
@@ -138,7 +138,7 @@ pub fn http_get_matrix(req: &mut ScReq, alpn: ALPN) {
 }
 
 ///Request method testing
-pub fn http_method(req: &mut ScReq) {
+pub fn http_method(req: &mut Session) {
     let post_json = body! {"name": "reqrio", "num": 7, "ok": true};
     let mut sids = vec![
         req.send(Method::GET, "https://httpbin.reqrio.com/get", None).unwrap(),
@@ -201,7 +201,7 @@ pub fn http_method(req: &mut ScReq) {
 }
 
 ///Request status testing
-pub fn http_status(req: &mut ScReq) {
+pub fn http_status(req: &mut Session) {
     let codes = [200u16, 201, 202, 204, 206, 301, 302, 304, 400, 401, 403, 404, 418, 500, 502, 503];
     let status = [
         HttpStatus::OK, HttpStatus::Created, HttpStatus::Accepted, HttpStatus::NoContent,
@@ -228,7 +228,7 @@ pub fn http_status(req: &mut ScReq) {
 }
 
 ///Authentication Request Test
-pub fn http_auth(req: &mut ScReq) {
+pub fn http_auth(req: &mut Session) {
     let sid = req.send(Method::GET, "https://httpbin.reqrio.com/basic-auth/user/passwd", None).unwrap();
     req.insert_header("Authorization", "Basic dXNlcjpwYXNzd2Q=");
     let mut sids = vec![
@@ -251,7 +251,7 @@ pub fn http_auth(req: &mut ScReq) {
 }
 
 ///Request parameter testing
-pub fn query_param(req: &mut ScReq) {
+pub fn query_param(req: &mut Session) {
     let p1 = [("q", "'reqrio'".to_string()), ("v", "\"reqrio\"".to_string()), ("n", 42.to_string()), ("b", true.to_string())];
     let p2 = [("added", "2")];
     let p3 = [("cn", "中文"), ("sp", "a b&c=d"), ("empty", "")];
@@ -302,7 +302,7 @@ pub fn query_param(req: &mut ScReq) {
 /// Redirection test
 /// * Non automatic redirection can be done using send
 /// * Automatic redirection cannot use send and recv
-pub fn http_redirect(req: &mut ScReq) {
+pub fn http_redirect(req: &mut Session) {
     req.set_auto_redirect(false);
     let mut ids = vec![
         req.send(Method::GET, "https://httpbin.reqrio.com/redirect/2", None).unwrap(),
@@ -343,7 +343,7 @@ pub fn http_redirect(req: &mut ScReq) {
 
 
 /// Request Cookie Test
-pub fn http_cookie(req: &mut ScReq) {
+pub fn http_cookie(req: &mut Session) {
     req.set_auto_redirect(false);
     let r1 = req.get("https://httpbin.reqrio.com/cookies/set?k=v&k2=v2", None).unwrap();
     assert_eq!(r1.status(), HttpStatus::Found);
@@ -360,7 +360,7 @@ pub fn http_cookie(req: &mut ScReq) {
 }
 
 /// Request Header Test
-pub fn http_header(req: &mut ScReq) {
+pub fn http_header(req: &mut Session) {
     req.merge_headers(header! {
         "User-Agent": format!("reqrio/{},reqrio-test",env!("CARGO_PKG_VERSION")),
         "X-Reqrio-Test": "hello",
@@ -421,7 +421,7 @@ pub fn http_header(req: &mut ScReq) {
     }
 }
 
-pub fn http_stream(req: &mut ScReq) {
+pub fn http_stream(req: &mut Session) {
     let sid1 = req.send(Method::GET, "https://httpbin.reqrio.com/bytes/16384", None).unwrap();
     let sid2 = req.send(Method::GET, "https://httpbin.reqrio.com/stream/3", None).unwrap();
     let mut total = 0usize;
@@ -439,7 +439,7 @@ pub fn http_stream(req: &mut ScReq) {
     assert_ne!(sid1, sid2)
 }
 
-pub fn http_helper(req: &mut ScReq) {
+pub fn http_helper(req: &mut Session) {
     // send_check：non 2xx is considered an error
     let res = req.send_check(Method::GET, "https://httpbin.reqrio.com/status/500", None);
     assert!(res.is_err());
@@ -472,7 +472,7 @@ pub fn http_helper(req: &mut ScReq) {
 }
 
 /// Form+JSON+File+Text+Bytes
-pub fn http_body(req: &mut ScReq) {
+pub fn http_body(req: &mut Session) {
     let d1 = body! {
         "str1": "s",
         "str2": "'s'",
@@ -615,7 +615,7 @@ pub fn http_body(req: &mut ScReq) {
     }
 }
 
-pub fn http_concurrency(req: &mut ScReq) {
+pub fn http_concurrency(req: &mut Session) {
     let mut sids = vec![];
     for i in 0..6 {
         sids.push(req.send(Method::GET, format!("https://httpbin.reqrio.com/get?i={}", i), None).unwrap());

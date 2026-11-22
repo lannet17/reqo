@@ -10,7 +10,7 @@ fn compare_reqrio_multiple_requests() {
     let mut body_length = 0;
 
     println!("reqrio: url={} count={}", url, request_count);
-    let mut req = ScReq::new();
+    let mut req = Session::new();
     for run in 1..=request_count {
         let start = Instant::now();
         let res = req.get(url, None).expect("reqrio get");

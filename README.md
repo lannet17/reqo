@@ -15,7 +15,7 @@ reqo = "0.5"
 
 ## Highlights
 
-- **Sync and async**: `ScReq` (blocking) and `AcReq` (tokio, `aync` feature) share the same API.
+- **Sync and async**: `reqo::Session` (blocking) and `reqo::aio::Session` (tokio, `aync` feature) share the same API.
 - **HTTP/1.1 and HTTP/2**, negotiated through ALPN, with pipelining (`send` / `recv`) and streaming responses.
 - **Header order is preserved** exactly as written; per-protocol default orders follow real browsers.
 - **HTTP/2 fingerprint**: SETTINGS / WINDOW_UPDATE frames and stream priority are configurable.
@@ -37,7 +37,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{} {}", res.status(), res.as_text()?);
 
     // Reusable session: keeps the connection, cookies and headers
-    let mut req = ScReq::new()
+    let mut req = Session::new()
         .with_alpn(ALPN::HTTP20)                    // offer h2, fall back to http/1.1
         .with_timeout(Timeout::new_same(5000, 3))   // 5s timeouts, up to 3 attempts
         .with_header(header! {
@@ -52,14 +52,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-Async works the same way with `AcReq` and `.await` (enable the `aync` feature):
+Async works the same way with `aio::Session` and `.await` (enable the `aync` feature):
 
 ```rust,ignore
 use reqo::*;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut req = AcReq::new().with_alpn(ALPN::HTTP20);
+    let mut req = aio::Session::new().with_alpn(ALPN::HTTP20);
     let res = req.get("https://httpbin.org/get", None).await?;
     println!("{}", res.as_text()?);
     Ok(())
@@ -117,7 +117,7 @@ let typed: MyStruct = res.json()?;
 ```rust,no_run
 # use reqo::*;
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
-# let mut req = ScReq::new();
+# let mut req = Session::new();
 // Query parameters
 let url = "https://httpbin.org/get".params([("q", "rust"), ("page", "2")])?;
 let res = req.get(url, None)?;
@@ -145,7 +145,7 @@ existing ones:
 
 ```rust,no_run
 # use reqo::*;
-# let mut req = ScReq::new();
+# let mut req = Session::new();
 req.merge_headers(header! { "x-trace": 42, "cookie": "a=1; b=2" });
 req.insert_header("x-late", "late");
 ```
@@ -168,7 +168,7 @@ let h2 = H2Finger {
     weight: 255,
     priority: true,
 };
-let req = ScReq::new().with_fingerprint(Fingerprint::new_h2(h2));
+let req = Session::new().with_fingerprint(Fingerprint::new_h2(h2));
 ```
 
 ## TLS
@@ -182,7 +182,7 @@ connection to a `TlsConnector` and gets an encrypted stream back.
 use reqo::*;
 
 let identity = ClientIdentity::from_pem_files("client.pem", "client.key")?;
-let req = ScReq::new()
+let req = Session::new()
     .with_version(TlsVersion::Tls13)            // highest version to offer
     .with_mtls(identity, None)                  // client certificate (mTLS)
     .with_key_log("keys.log");                  // NSS key log for Wireshark (debugging only)
@@ -216,7 +216,7 @@ impl TlsConnector for MyConnector {
     // With the `aync` feature, also override `connect_async`.
 }
 
-let req = ScReq::new().with_tls_connector(std::sync::Arc::new(MyConnector));
+let req = Session::new().with_tls_connector(std::sync::Arc::new(MyConnector));
 ```
 
 `TlsOptions` passes the server name, the ALPN list, verify mode, maximum
@@ -229,8 +229,8 @@ ClientHello fingerprint) on its connector type.
 ```rust,no_run
 # use reqo::*;
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
-let req = ScReq::new().with_proxy(Proxy::try_from("socks5://user:pass@127.0.0.1:1080")?);
-let req = ScReq::new().with_proxy(Proxy::try_from("http://127.0.0.1:8080")?);
+let req = Session::new().with_proxy(Proxy::try_from("socks5://user:pass@127.0.0.1:1080")?);
+let req = Session::new().with_proxy(Proxy::try_from("http://127.0.0.1:8080")?);
 
 let mut ws = WebSocket::open_sync("wss://echo.websocket.org")?;
 ws.send_text("hello").wait()?;
@@ -245,7 +245,7 @@ let frame = ws.read_frame().wait()?;
 |----------|:-------:|-------------------------------------------------------------------|
 | `rustls` |   yes   | Default TLS backend (rustls + ring + webpki-roots)                |
 | `zstd`   |   yes   | zstd content decoding (libzstd is compiled from source by `cc`)   |
-| `aync`   |         | Async API (`AcReq`, async WebSocket) on tokio                     |
+| `aync`   |         | Async API (`aio::Session`, async WebSocket) on tokio                     |
 | `serde`  |         | `Response::json::<T>()`, `Body::json(&T)`, serde derives          |
 | `log`    |         | Internal logging through the `log` crate                          |
 

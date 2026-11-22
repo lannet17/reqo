@@ -13,7 +13,7 @@
 //! ## Core Features
 //!
 //! - **Efficient Reference-Based Architecture**: Leverages Rust's ownership model with `Cow` and lifetime borrowing to minimize allocations
-//! - **Dual Concurrency Models**: Sync (`ScReq`) and Async (`AcReq`) engines for flexible deployment
+//! - **Dual Concurrency Models**: Sync (`Session`) and Async (`aio::Session`) sessions for flexible deployment
 //! - **Bring Your Own TLS**: implement [`tls::TlsConnector`] to plug in any TLS stack (e.g. one with ClientHello fingerprinting)
 //! - **Strict Header Ordering**: Enforces HTTP/2.0 and HTTP/1.1 header sequences consistent with real browser requests
 //! - **Complete Protocol Support**: HTTP/1.1, HTTP/2.0, and full-duplex WebSocket with connection pooling
@@ -24,17 +24,17 @@
 //!```text
 //! ┌ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ Write ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┐
 //! │        Form  ┌─────────┐           ┌───────────────┐           ┌─────────────┐           ┌──────┐ │
-//! │ User ───────►│  Req    │  Body     │ RequestBuf    │  Buffer   │             │ Encrypted │      │ │
-//! │        Json  │ Engine  ├─ Cow<T> ──┤ Header + Body │──────────►│  TlsStream  │──────────►│ TCP  │ │
+//! │ User ───────►│ Session │  Body     │ RequestBuf    │  Buffer   │             │ Encrypted │      │ │
+//! │        Json  │         ├─ Cow<T> ──┤ Header + Body │──────────►│  TlsStream  │──────────►│ TCP  │ │
 //! │        Files │ (Sync)  │ Lifetime  │    Readers    │           │   Encrypt   │           │ Send │ │
-//! │ User ───────►│ (Async) │           │ (borrowed)    │           │             │           │      │ │
+//! │ User ───────►│ (aio)   │           │ (borrowed)    │           │             │           │      │ │
 //! │              └─────────┘           └───────────────┘           └─────────────┘           └──────┘ │
 //! └ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┘
 //! ┌ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─  Read ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─  ─ ─ ─ ─ ┐
 //! │                 ┌──────────┐            ┌────────┐                 │
-//! │ ┌───────┐ read  │   TLS    │ decrypt to │ ScReq  │  return         │
-//! │ │  TCP  │──────►│ Fragment │───────────►│ AcReq  │─────────► User  │
-//! │ └───────┘       │ Decrypt  │            │(Engine)│ Response        │
+//! │ ┌───────┐ read  │   TLS    │ decrypt to │Session │  return         │
+//! │ │  TCP  │──────►│ Fragment │───────────►│ (sync/ │─────────► User  │
+//! │ └───────┘       │ Decrypt  │            │  aio)  │ Response        │
 //! │                 └──────────┘            └────────┘                 │
 //! └ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─┘
 //!
@@ -141,7 +141,7 @@
 //!     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
 //! };
 //!
-//! let mut session = ScReq::new()
+//! let mut session = Session::new()
 //!     .with_alpn(ALPN::HTTP20)                    // Use HTTP/2.0 for modern sites
 //!     .with_header(headers)                      // Set browser-compatible headers
 //!     .with_timeout(Timeout::new_same(5000, 3)); // 5s timeout with 3 retries
@@ -198,13 +198,13 @@
 //!
 //! ## Thread Safety & Concurrency
 //!
-//! - `ScReq` (Sync): Single-threaded, `Send + Sync` for thread pools
-//! - `AcReq` (Async): Tokio-based, designed for `async/await` workloads
+//! - `Session` (Sync): Single-threaded, `Send + Sync` for thread pools
+//! - `aio::Session` (Async): Tokio-based, designed for `async/await` workloads
 //! - Connection pooling and session reuse recommended for production
 //!
 //! ## Feature Flags
 //!
-//! - `aync`: Enable async runtime with Tokio support (required for `AcReq`)
+//! - `aync`: Enable async runtime with Tokio support (required for `aio::Session`)
 //! - `export`: Enable C FFI bindings for cross-language integration
 //! - `serde`: Enable serde serialization/deserialization support
 //! - `log`: Enable internal debug logging (requires Rust nightly)
@@ -226,7 +226,7 @@
 //! // Client certificate chain + key (PEM), and an optional private CA bundle (PEM).
 //! let identity = ClientIdentity::from_pem_files("client.pem", "client.key")?;
 //! let ca = std::fs::read("ca-bundle.pem")?;
-//! let req = ScReq::new().with_mtls(identity, Some(ca));
+//! let req = Session::new().with_mtls(identity, Some(ca));
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
@@ -239,7 +239,7 @@
 //! reqo = { version = "0.5", default-features = false }
 //! ```
 //! ```rust,ignore
-//! let req = ScReq::new().with_tls_connector(std::sync::Arc::new(MyConnector::new()));
+//! let req = Session::new().with_tls_connector(std::sync::Arc::new(MyConnector::new()));
 //! ```
 //!
 //! ### Proxy Configuration
@@ -248,7 +248,7 @@
 //! ```rust,no_run
 //! # use reqo::*;
 //! // let proxy = Proxy::http("http://proxy.example.com:8080")?;
-//! // let mut req = ScReq::new().with_proxy(proxy);
+//! // let mut req = Session::new().with_proxy(proxy);
 //! ```
 //!
 //! ## Ecosystem Integration
@@ -286,7 +286,16 @@ pub const HTTP_GAP: &[u8; 4] = b"\r\n\r\n";
 pub const CHUNK_END: [u8; 7] = [13, 10, 48, 13, 10, 13, 10];
 
 #[cfg(feature = "aync")]
-pub use acq::AcReq;
+pub mod aio {
+    //! Asynchronous (tokio) API. Same methods as [`crate::Session`], awaited:
+    //!
+    //! ```rust,ignore
+    //! use reqo::aio::Session;
+    //! let mut s = Session::new();
+    //! let res = s.get("https://httpbin.org/get", None).await?;
+    //! ```
+    pub use crate::acq::Session;
+}
 pub use body::{Body, BodyExt, Field, FileForm, HttpFile, ToJson};
 #[doc(hidden)]
 pub use body::__private;
@@ -303,7 +312,7 @@ pub use packet::{H3Payload, H3FrameType, H3Setting, H3Frame};
 pub use reqo_base::*;
 #[cfg(feature = "log")]
 pub use log::*;
-pub use scq::ScReq;
+pub use scq::Session;
 pub use stream::{Proxy, ProxyStream, ConnParam, WebSocket, TlsStream, Stream, StreamMessage};
 #[cfg(feature = "aync")]
 pub use stream::AsyncTlsStream;
@@ -330,7 +339,7 @@ use crate::ext::ReqUrl;
 /// * `url` - request URL or URL-like value.
 /// * `body` - request body payload.
 pub fn get<'a>(url: impl Into<ReqUrl<'a>>, body: impl Into<Body<'a>>) -> HlsResult<Response> {
-    ScReq::new().get(url, body)
+    Session::new().get(url, body)
 }
 
 /// Send a POST request with a temporary session.
@@ -338,7 +347,7 @@ pub fn get<'a>(url: impl Into<ReqUrl<'a>>, body: impl Into<Body<'a>>) -> HlsResu
 /// * `url` - request URL or URL-like value.
 /// * `body` - request body payload.
 pub fn post<'a>(url: impl Into<ReqUrl<'a>>, body: impl Into<Body<'a>>) -> HlsResult<Response> {
-    ScReq::new().post(url, body)
+    Session::new().post(url, body)
 }
 
 /// Send a PUT request with a temporary session.
@@ -346,5 +355,5 @@ pub fn post<'a>(url: impl Into<ReqUrl<'a>>, body: impl Into<Body<'a>>) -> HlsRes
 /// * `url` - request URL or URL-like value.
 /// * `body` - request body payload.
 pub fn put<'a>(url: impl Into<ReqUrl<'a>>, body: impl Into<Body<'a>>) -> HlsResult<Response> {
-    ScReq::new().put(url, body)
+    Session::new().put(url, body)
 }

@@ -14,7 +14,7 @@
 //! impl reqo::tls::TlsConnector for MyConnector {
 //!     fn connect(&self, io: Box<dyn SyncIo>, opts: &TlsOptions<'_>) -> HlsResult<Box<dyn TlsIo>> { ... }
 //! }
-//! let req = ScReq::new().with_tls_connector(Arc::new(MyConnector));
+//! let req = Session::new().with_tls_connector(Arc::new(MyConnector));
 //! ```
 
 #[cfg(feature = "rustls")]
@@ -139,7 +139,7 @@ pub(crate) fn alpn_offer(preferred: &ALPN) -> &'static [ALPN] {
     if *preferred == ALPN::HTTP20 { H2 } else { H1 }
 }
 
-/// Per-session TLS settings (shared by `ScReq` / `AcReq`).
+/// Per-session TLS settings (shared by `Session` / `aio::Session`).
 #[derive(Clone)]
 pub(crate) struct TlsSettings {
     pub(crate) verify: bool,

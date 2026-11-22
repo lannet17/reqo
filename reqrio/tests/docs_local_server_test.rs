@@ -184,8 +184,8 @@ fn handle_conn(stream: TcpStream) {
     }
 }
 
-fn client() -> ScReq {
-    ScReq::new()
+fn client() -> Session {
+    Session::new()
         .with_timeout(Timeout::new_same(15000, 1))
         .with_alpn(ALPN::HTTP11)
 }

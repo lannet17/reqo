@@ -18,7 +18,7 @@ pub use file_form::FileForm;
 /// let data=[("key","value")];
 /// let mut file=HttpFile::new_path_data(data,"path/to/file1").unwrap();
 /// file.add_form(FileForm::new_path("path/to/file2").unwrap());
-/// let mut req=ScReq::new();
+/// let mut req=Session::new();
 /// req.post("https://url/api",file).unwrap();
 /// ```
 const NO_DATA: [(&str, &str); 0] = [];

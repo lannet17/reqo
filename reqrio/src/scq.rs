@@ -8,7 +8,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 /// Reusable synchronous HTTP client session.
-pub struct ScReq {
+pub struct Session {
     header: Header,
     stream: HTTPStream,
     timeout: Timeout,
@@ -24,9 +24,9 @@ pub struct ScReq {
     recv_ids: HashSet<u64>,
 }
 
-impl Default for ScReq {
+impl Default for Session {
     fn default() -> Self {
-        ScReq {
+        Session {
             header: Header::default(),
             stream: HTTPStream::NonConnection,
             timeout: Timeout::default(),
@@ -45,10 +45,10 @@ impl Default for ScReq {
 }
 
 
-impl ScReq {
+impl Session {
     /// Create a new request session with default settings.
-    pub fn new() -> ScReq {
-        ScReq::default()
+    pub fn new() -> Session {
+        Session::default()
     }
 
     pub fn get<'a>(&mut self, url: impl Into<ReqUrl<'a>>, body: impl Into<Body<'a>>) -> HlsResult<Response> {
@@ -191,7 +191,7 @@ impl ScReq {
         Err("stream io error".into())
     }
 
-    pub fn connect<'a>(mut self, url: impl Into<ReqUrl<'a>>) -> HlsResult<ScReq> {
+    pub fn connect<'a>(mut self, url: impl Into<ReqUrl<'a>>) -> HlsResult<Session> {
         let url = url.into().build()?;
         self.re_conn(Some(url.as_ref()))?;
         Ok(self)
@@ -211,7 +211,7 @@ impl ScReq {
                 Ok(alpn) => {
                     #[cfg(feature = "log")]
                     debug!(
-                        "[AcReq] Connected | ALPN: {} | RemoteAddr: {} | IgnoreOrder: {}",
+                        "[Session] Connected | ALPN: {} | RemoteAddr: {} | IgnoreOrder: {}",
                         alpn,
                         url.unwrap_or(&self.url).addr(),
                         self.ignore_order
@@ -225,7 +225,7 @@ impl ScReq {
                 }
             }
         }
-        Err("[ScReq] connection error".into())
+        Err("[Session] connection error".into())
     }
 
     pub(crate) fn set_url(&mut self, url: &Url) -> HlsResult<()> {
@@ -265,7 +265,7 @@ impl ScReq {
     }
 }
 
-impl ReqStreamExt for ScReq {
+impl ReqStreamExt for Session {
     fn into_stream(self) -> HlsResult<Stream> {
         self.stream.into_stream()
     }
@@ -275,13 +275,13 @@ impl ReqStreamExt for ScReq {
     }
 }
 
-impl ReqPriExt for ScReq {
+impl ReqPriExt for Session {
     fn responses(&mut self) -> &mut HashMap<u64, StreamMessage> {
         &mut self.responses
     }
 }
 
-impl ReqExt for ScReq {
+impl ReqExt for Session {
     fn header_mut(&mut self) -> &mut Header {
         &mut self.header
     }

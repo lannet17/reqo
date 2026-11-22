@@ -13,7 +13,7 @@ reqo = "0.5"
 
 ## 特性
 
-- **同步 + 异步**：`ScReq`（阻塞）和 `AcReq`（基于 tokio，需开启 `aync` feature）API 一致。
+- **同步 + 异步**：`reqo::Session`（阻塞）和 `reqo::aio::Session`（基于 tokio，需开启 `aync` feature）API 一致。
 - **HTTP/1.1 和 HTTP/2**：通过 ALPN 协商，支持流水线请求（`send` / `recv`）和流式响应。
 - **请求头保序**：严格按书写顺序发送；各协议的默认顺序参照真实浏览器。
 - **HTTP/2 指纹**：SETTINGS / WINDOW_UPDATE 帧和流优先级都可以配置。
@@ -35,7 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{} {}", res.status(), res.as_text()?);
 
     // 可复用的会话：保持连接、cookie 和请求头
-    let mut req = ScReq::new()
+    let mut req = Session::new()
         .with_alpn(ALPN::HTTP20)                    // 优先 h2，不支持时回落到 http/1.1
         .with_timeout(Timeout::new_same(5000, 3))   // 超时 5 秒，最多尝试 3 次
         .with_header(header! {
@@ -50,14 +50,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-异步用法相同，换成 `AcReq` 并加上 `.await`（需开启 `aync` feature）：
+异步用法相同，换成 `aio::Session` 并加上 `.await`（需开启 `aync` feature）：
 
 ```rust,ignore
 use reqo::*;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut req = AcReq::new().with_alpn(ALPN::HTTP20);
+    let mut req = aio::Session::new().with_alpn(ALPN::HTTP20);
     let res = req.get("https://httpbin.org/get", None).await?;
     println!("{}", res.as_text()?);
     Ok(())
@@ -114,7 +114,7 @@ let typed: MyStruct = res.json()?;
 ```rust,no_run
 # use reqo::*;
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
-# let mut req = ScReq::new();
+# let mut req = Session::new();
 // 查询参数
 let url = "https://httpbin.org/get".params([("q", "rust"), ("page", "2")])?;
 let res = req.get(url, None)?;
@@ -141,7 +141,7 @@ while let Some(chunk) = req.next_chunk(sid)? {
 
 ```rust,no_run
 # use reqo::*;
-# let mut req = ScReq::new();
+# let mut req = Session::new();
 req.merge_headers(header! { "x-trace": 42, "cookie": "a=1; b=2" });
 req.insert_header("x-late", "late");
 ```
@@ -164,7 +164,7 @@ let h2 = H2Finger {
     weight: 255,
     priority: true,
 };
-let req = ScReq::new().with_fingerprint(Fingerprint::new_h2(h2));
+let req = Session::new().with_fingerprint(Fingerprint::new_h2(h2));
 ```
 
 ## TLS
@@ -177,7 +177,7 @@ reqo 自己不做 TLS 握手。它把（可能经过代理的）连接交给一�
 use reqo::*;
 
 let identity = ClientIdentity::from_pem_files("client.pem", "client.key")?;
-let req = ScReq::new()
+let req = Session::new()
     .with_version(TlsVersion::Tls13)            // 最高提供的 TLS 版本
     .with_mtls(identity, None)                  // 客户端证书（mTLS）
     .with_key_log("keys.log");                  // 导出 NSS key log 供 Wireshark 解密（仅限调试）
@@ -210,7 +210,7 @@ impl TlsConnector for MyConnector {
     // 开启 `aync` feature 时，还需要实现 `connect_async`。
 }
 
-let req = ScReq::new().with_tls_connector(std::sync::Arc::new(MyConnector));
+let req = Session::new().with_tls_connector(std::sync::Arc::new(MyConnector));
 ```
 
 `TlsOptions` 会传入服务器名、ALPN 列表、是否校验证书、最高版本、客户端证书、CA 证书和 key log 路径。
@@ -221,8 +221,8 @@ let req = ScReq::new().with_tls_connector(std::sync::Arc::new(MyConnector));
 ```rust,no_run
 # use reqo::*;
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
-let req = ScReq::new().with_proxy(Proxy::try_from("socks5://user:pass@127.0.0.1:1080")?);
-let req = ScReq::new().with_proxy(Proxy::try_from("http://127.0.0.1:8080")?);
+let req = Session::new().with_proxy(Proxy::try_from("socks5://user:pass@127.0.0.1:1080")?);
+let req = Session::new().with_proxy(Proxy::try_from("http://127.0.0.1:8080")?);
 
 let mut ws = WebSocket::open_sync("wss://echo.websocket.org")?;
 ws.send_text("hello").wait()?;
@@ -237,7 +237,7 @@ let frame = ws.read_frame().wait()?;
 |----------|:----:|--------------------------------------------------------|
 | `rustls` |  是  | 默认 TLS 后端（rustls + ring + webpki-roots）          |
 | `zstd`   |  是  | zstd 解码（libzstd 由 `cc` 从源码编译）                |
-| `aync`   |      | 基于 tokio 的异步 API（`AcReq`、异步 WebSocket）       |
+| `aync`   |      | 基于 tokio 的异步 API（`aio::Session`、异步 WebSocket）       |
 | `serde`  |      | `Response::json::<T>()`、`Body::json(&T)`、serde 派生  |
 | `log`    |      | 通过 `log` crate 输出内部日志                          |
 

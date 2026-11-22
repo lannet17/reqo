@@ -1,4 +1,4 @@
-use reqo::{Application, ContentType, FileForm, HttpFile, HttpStatus, ImageType, Method, ReqExt, AcReq, Text, UrlExt, Body, body, header};
+use reqo::{Application, ContentType, FileForm, HttpFile, HttpStatus, ImageType, Method, ReqExt, aio::Session, Text, UrlExt, Body, body, header};
 use reqo::{ALPN, base64, coder, rand};
 use serde_json::Value;
 
@@ -23,7 +23,7 @@ pub fn fv(body: &Body, key: &str) -> String {
 
 
 ///Testing different types of requests
-pub async fn http_get_matrix(req: &mut AcReq, alpn: ALPN) {
+pub async fn http_get_matrix(req: &mut Session, alpn: ALPN) {
     let mut sids = vec![
         req.send(Method::GET, "https://httpbin.reqrio.com", None).await.unwrap(),                // 0 首页
         req.send(Method::GET, "https://httpbin.reqrio.com/get", None).await.unwrap(),            // 1 查询串回显
@@ -136,7 +136,7 @@ pub async fn http_get_matrix(req: &mut AcReq, alpn: ALPN) {
 }
 
 ///Request method testing
-pub async fn http_method(req: &mut AcReq) {
+pub async fn http_method(req: &mut Session) {
     let post_json = body! {"name": "reqrio", "num": 7, "ok": true};
     let mut sids = vec![
         req.send(Method::GET, "https://httpbin.reqrio.com/get", None).await.unwrap(),
@@ -199,7 +199,7 @@ pub async fn http_method(req: &mut AcReq) {
 }
 
 ///Request status testing
-pub async fn http_status(req: &mut AcReq) {
+pub async fn http_status(req: &mut Session) {
     let codes = [200u16, 201, 202, 204, 206, 301, 302, 304, 400, 401, 403, 404, 418, 500, 502, 503];
     let status = [
         HttpStatus::OK, HttpStatus::Created, HttpStatus::Accepted, HttpStatus::NoContent,
@@ -227,7 +227,7 @@ pub async fn http_status(req: &mut AcReq) {
 }
 
 ///Authentication Request Test
-pub async fn http_auth(req: &mut AcReq) {
+pub async fn http_auth(req: &mut Session) {
     let sid = req.send(Method::GET, "https://httpbin.reqrio.com/basic-auth/user/passwd", None).await.unwrap();
     req.insert_header("Authorization", "Basic dXNlcjpwYXNzd2Q=");
     let mut sids = vec![
@@ -250,7 +250,7 @@ pub async fn http_auth(req: &mut AcReq) {
 }
 
 ///Request parameter testing
-pub async fn query_param(req: &mut AcReq) {
+pub async fn query_param(req: &mut Session) {
     let p1 = [("q", "'reqrio'".to_string()), ("v", "\"reqrio\"".to_string()), ("n", 42.to_string()), ("b", true.to_string())];
     let p2 = [("added", "2")];
     let p3 = [("cn", "中文"), ("sp", "a b&c=d"), ("empty", "")];
@@ -301,7 +301,7 @@ pub async fn query_param(req: &mut AcReq) {
 /// Redirection test
 /// * Non automatic redirection can be done using send
 /// * Automatic redirection cannot use send and recv
-pub async fn http_redirect(req: &mut AcReq) {
+pub async fn http_redirect(req: &mut Session) {
     req.set_auto_redirect(false);
     let mut ids = vec![
         req.send(Method::GET, "https://httpbin.reqrio.com/redirect/2", None).await.unwrap(),
@@ -342,7 +342,7 @@ pub async fn http_redirect(req: &mut AcReq) {
 
 
 /// Request Cookie Test
-pub async fn http_cookie(req: &mut AcReq) {
+pub async fn http_cookie(req: &mut Session) {
     req.set_auto_redirect(false);
     let r1 = req.get("https://httpbin.reqrio.com/cookies/set?k=v&k2=v2", None).await.unwrap();
     assert_eq!(r1.status(), HttpStatus::Found);
@@ -359,7 +359,7 @@ pub async fn http_cookie(req: &mut AcReq) {
 }
 
 /// Request Header Test
-pub async fn http_header(req: &mut AcReq) {
+pub async fn http_header(req: &mut Session) {
     req.merge_headers(header! {
         "User-Agent": format!("reqrio/{},reqrio-test",env!("CARGO_PKG_VERSION")),
         "X-Reqrio-Test": "hello",
@@ -420,7 +420,7 @@ pub async fn http_header(req: &mut AcReq) {
     }
 }
 
-pub async fn http_stream(req: &mut AcReq) {
+pub async fn http_stream(req: &mut Session) {
     let sid1 = req.send(Method::GET, "https://httpbin.reqrio.com/bytes/16384", None).await.unwrap();
     let sid2 = req.send(Method::GET, "https://httpbin.reqrio.com/stream/3", None).await.unwrap();
     let mut total = 0usize;
@@ -438,7 +438,7 @@ pub async fn http_stream(req: &mut AcReq) {
     assert_ne!(sid1, sid2)
 }
 
-pub async fn http_helper(req: &mut AcReq) {
+pub async fn http_helper(req: &mut Session) {
     // send_check：non 2xx is considered an error
     let res = req.send_check(Method::GET, "https://httpbin.reqrio.com/status/500", None).await;
     assert!(res.is_err());
@@ -471,7 +471,7 @@ pub async fn http_helper(req: &mut AcReq) {
 }
 
 /// Form+JSON+File+Text+Bytes
-pub async fn http_body(req: &mut AcReq) {
+pub async fn http_body(req: &mut Session) {
     let d1 = body! {
         "str1": "s",
         "str2": "'s'",
@@ -615,7 +615,7 @@ pub async fn http_body(req: &mut AcReq) {
 }
 
 
-pub async fn http_concurrency(req: &mut AcReq) {
+pub async fn http_concurrency(req: &mut Session) {
     let mut sids = vec![];
     for i in 0..6 {
         sids.push(req.send(Method::GET, format!("https://httpbin.reqrio.com/get?i={}", i), None).await.unwrap());

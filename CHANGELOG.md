@@ -12,6 +12,7 @@ First release as `reqo`, forked from reqrio 0.4.2. TLS is now pluggable and rust
   and the old TLS re-exports. `HlsError::Rls` was replaced by `HlsError::Base` / `HlsError::Tls`.
 * Fix: HTTP/1.1 pipelining stalled when the next response was already buffered, and a compressed body
   could be decoded past its `Content-Length`.
+* `ScReq` is now `reqo::Session` and `AcReq` is now `reqo::aio::Session` (same API, selected by import path).
 * Removed the `reqrio-json` crate. New macros instead:
   `body!{..}` builds a JSON body (`body!{..}.form()` for urlencoded), `header!{..}` builds a `Header`.
   Values are plain std types (`ToJson`); there is no JSON value type in reqo anymore.

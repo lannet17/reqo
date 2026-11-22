@@ -82,7 +82,7 @@ pub trait ReqExt: Sized {
     /// use reqo::*;
     /// use reqo::tls::ClientIdentity;
     ///
-    /// let mut req = ScReq::new();
+    /// let mut req = Session::new();
     /// let id = ClientIdentity::from_pem_files("client.pem", "client.key").unwrap();
     /// req.set_mtls(id, None);
     /// ```

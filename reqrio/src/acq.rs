@@ -10,7 +10,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 /// Asynchronous HTTP client session for non-blocking requests.
-pub struct AcReq {
+pub struct Session {
     header: Header,
     stream: HTTPStream,
     timeout: Timeout,
@@ -26,9 +26,9 @@ pub struct AcReq {
     recv_ids: HashSet<u64>,
 }
 
-impl Default for AcReq {
+impl Default for Session {
     fn default() -> Self {
-        AcReq {
+        Session {
             header: Header::default(),
             stream: HTTPStream::NonConnection,
             timeout: Timeout::default(),
@@ -46,10 +46,10 @@ impl Default for AcReq {
     }
 }
 
-impl AcReq {
+impl Session {
     /// Create a new async request session with default settings.
-    pub fn new() -> AcReq {
-        AcReq::default()
+    pub fn new() -> Session {
+        Session::default()
     }
 
     pub async fn get<'a>(&mut self, url: impl Into<ReqUrl<'a>>, body: impl Into<Body<'a>>) -> HlsResult<Response> {
@@ -196,7 +196,7 @@ impl AcReq {
         Err("stream io error".into())
     }
 
-    pub async fn connect<'a>(mut self, url: impl Into<ReqUrl<'a>>) -> HlsResult<AcReq> {
+    pub async fn connect<'a>(mut self, url: impl Into<ReqUrl<'a>>) -> HlsResult<Session> {
         let url = url.into().build()?;
         self.re_conn(Some(url.as_ref())).await?;
         Ok(self)
@@ -218,7 +218,7 @@ impl AcReq {
                 Ok(Err(e)) => if i >= self.timeout.handle_times() { return Err(e) }
                 Ok(Ok(alpn)) => {
                     #[cfg(feature = "log")]
-                    debug!("[AcReq] Connected | ALPN: {} | RemoteAddr: {}", alpn, url.unwrap_or(&self.url).addr());
+                    debug!("[aio::Session] Connected | ALPN: {} | RemoteAddr: {}", alpn, url.unwrap_or(&self.url).addr());
                     if !self.ignore_order { self.header.init_by_alpn(alpn); }
                     if let Some(url) = url {
                         self.url = url.clone();
@@ -228,7 +228,7 @@ impl AcReq {
             }
             continue;
         }
-        Err("[AcReq] connection error".into())
+        Err("[aio::Session] connection error".into())
     }
 
     pub(crate) async fn set_url(&mut self, url: &Url) -> HlsResult<()> {
@@ -268,7 +268,7 @@ impl AcReq {
     }
 }
 
-impl ReqStreamExt for AcReq {
+impl ReqStreamExt for Session {
     fn into_stream(self) -> HlsResult<Stream> {
         self.stream.into_stream()
     }
@@ -278,13 +278,13 @@ impl ReqStreamExt for AcReq {
     }
 }
 
-impl ReqPriExt for AcReq {
+impl ReqPriExt for Session {
     fn responses(&mut self) -> &mut HashMap<u64, StreamMessage> {
         &mut self.responses
     }
 }
 
-impl ReqExt for AcReq {
+impl ReqExt for Session {
     fn header_mut(&mut self) -> &mut Header {
         &mut self.header
     }
@@ -351,6 +351,6 @@ impl ReqExt for AcReq {
     }
 }
 
-unsafe impl Send for AcReq {}
+unsafe impl Send for Session {}
 
-unsafe impl Sync for AcReq {}
+unsafe impl Sync for Session {}
