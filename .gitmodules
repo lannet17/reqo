@@ -1,4 +1,0 @@
-[submodule "bindings"]
-	path = bindings
-	url = https://github.com/xllgl2017/reqrio-bindings
-	update = none

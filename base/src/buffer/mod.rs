@@ -1,7 +1,5 @@
-//! Pure-Rust replacement for the C-backed `Writer` / `Reader` in reqtls.
-//!
-//! The public API mirrors the original so that reqrio code keeps working,
-//! but storage is a plain `Vec<u8>` and there is no FFI.
+//! Byte buffers: [`Writer`] (fixed-capacity buffer with a filled window) and
+//! [`Reader`] (big-endian cursor). Storage is a plain `Vec<u8>`.
 
 mod error;
 mod reader;

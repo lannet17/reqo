@@ -14,7 +14,7 @@
 //!
 //! - **Efficient Reference-Based Architecture**: Leverages Rust's ownership model with `Cow` and lifetime borrowing to minimize allocations
 //! - **Dual Concurrency Models**: Sync (`ScReq`) and Async (`AcReq`) engines for flexible deployment
-//! - **TLS Fingerprinting**: available through the optional reqtls backend (hex / Ja3 / Ja4)
+//! - **Bring Your Own TLS**: implement [`tls::TlsConnector`] to plug in any TLS stack (e.g. one with ClientHello fingerprinting)
 //! - **Strict Header Ordering**: Enforces HTTP/2.0 and HTTP/1.1 header sequences consistent with real browser requests
 //! - **Complete Protocol Support**: HTTP/1.1, HTTP/2.0, and full-duplex WebSocket with connection pooling
 //!
@@ -232,16 +232,14 @@
 //!
 //! ### TLS backends
 //! TLS is pluggable through [`tls::TlsConnector`]. The default `rustls` feature
-//! uses rustls; to use another backend (e.g. reqtls for ClientHello
-//! fingerprinting), disable default features and install its connector:
+//! uses rustls; to use another TLS stack, disable default features and install
+//! its connector:
 //!
 //! ```toml
-//! # take both from the same git source, so there is only one `reqo` (and one `TlsConnector` trait)
-//! reqo = { git = "https://github.com/lannet17/reqo", default-features = false }
-//! reqtls = { git = "https://github.com/lannet17/reqo", features = ["reqo"] }
+//! reqo = { version = "0.5", default-features = false }
 //! ```
 //! ```rust,ignore
-//! let req = ScReq::new().with_tls_connector(std::sync::Arc::new(reqtls::ReqtlsConnector::default()));
+//! let req = ScReq::new().with_tls_connector(std::sync::Arc::new(MyConnector::new()));
 //! ```
 //!
 //! ### Proxy Configuration
@@ -274,6 +272,11 @@ mod reader;
 mod cookie;
 pub mod tls;
 mod macros;
+
+/// Compile-checks the code samples in README.md.
+#[cfg(doctest)]
+#[doc = include_str!("../../README.md")]
+pub struct ReadmeDoctests;
 mod time;
 #[cfg(feature = "log")]
 mod logger;

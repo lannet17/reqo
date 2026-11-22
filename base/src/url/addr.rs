@@ -76,7 +76,7 @@ impl Addr {
         let mut cache = match IpAddr::from_str(&self.host) {
             Ok(addr) => DNSCache::new_addrs(vec![addr]),
             Err(_) => {
-                // `ech` (DNS HTTPS-record lookup) is only meaningful for the reqtls backend.
+                // `ech` (DNS HTTPS-record lookup) is left to TLS backends that support it.
                 let _ = ech;
                 let addrs = format!("{}:{}", self.host, self.port).to_socket_addrs()?.map(|x| x.ip()).collect();
                 DNSCache::new_addrs(addrs)

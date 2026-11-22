@@ -4,11 +4,10 @@ members = [
     "base",
     "reqrio",
 ]
-exclude = ["reqtls"]
 
 [workspace.dependencies]
 serde = { version = "1.0", features = ["derive"] }
-reqo-base = { path = "base", version = "0.5.0" }
+reqo-base = { path = "base", version = "0.5.0", default-features = false }
 
 [profile.release]
 opt-level = 3

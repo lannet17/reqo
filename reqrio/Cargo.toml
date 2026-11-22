@@ -2,7 +2,7 @@
 name = "reqo"
 version = "0.5.0"
 edition = "2024"
-readme = "README.md"
+readme = "../README.md"
 description = "A lightweight, high-performance HTTP request library with pluggable TLS backends (rustls by default)."
 license-file = "../LICENSE-APACHE"
 repository = "https://github.com/lannet17/reqo"
@@ -30,7 +30,7 @@ name = "async_http_test"
 required-features = ["aync", "serde"]
 
 [features]
-default = ["rustls"]
+default = ["rustls", "zstd"]
 # `Response::json::<T>()`, `Body::json(&T)` and serde derives.
 serde = ["dep:serde", "dep:serde_json"]
 rustls = ["dep:rustls", "dep:webpki-roots"]

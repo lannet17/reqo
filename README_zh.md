@@ -1,221 +1,259 @@
-# 📦 reqrio
+# reqo
 
-### Browser-grade TLS Fingerprinting & High Performance HTTP Client
+[English](README.md)
 
-[![Github](https://github.com/xllgl2017/reqrio/actions/workflows/main.yml/badge.svg)](https://github.com/xllgl2017/reqrio/actions/workflows/main.yml)
-[![Apache](https://img.shields.io/badge/license-Apache2.0-blue.svg?logo=apache)](https://github.com/xllgl2017/reqrio/blob/main/LICENSE-APACHE)
-[![Crates](https://img.shields.io/crates/v/reqrio.svg?logo=rust&label=rust)](https://crates.io/crates/reqrio)
-[![PyPI](https://img.shields.io/pypi/v/reqrio.svg?logo=pypi)](https://pypi.org/project/reqrio/)
-[![Npm](https://img.shields.io/npm/v/reqrio.svg?logo=npm)](https://www.npmjs.org/package/reqrio)
-[![Maven](https://img.shields.io/maven-central/v/io.github.xllgl2017/reqrio?logo=apachemaven&label=maven)](https://search.maven.org/artifact/io.github.xllgl2017/reqrio)
-[![Go](https://img.shields.io/crates/v/reqrio.svg?logo=go&label=go)](https://pkg.go.dev/github.com/xllgl2017/reqrio/reqrio-go)
+**reqo** 是一个轻量的 Rust HTTP 客户端，**TLS 层可插拔**。
+它支持 HTTP/1.1 和 HTTP/2，同时提供同步和异步两套会话，请求头严格按照你写的顺序发送，
+HTTP/2 的连接参数也可以自定义。默认使用 rustls 处理 TLS，实现一个 trait 就能换成任何其他 TLS 实现。
 
-[![Rustdocs](https://docs.rs/reqrio/badge.svg)](https://docs.rs/reqrio)
-[![Javadocs](https://javadoc.io/badge/io.github.xllgl2017/reqrio/latest.svg)](https://javadoc.io/doc/io.github.xllgl2017/reqrio/latest)
-
-
----
-
-🌐 **官方网站**: [reqrio](https://www.reqrio.com/)
-
-💡 **应用案例**: [TLS Forward](https://tlsfoward.com/) — 基于 reqrio 构建的高级抓包工具
-
-✨ **免费使用**: [Token](https://github.com/xllgl2017/reqrio/issues/43) 此仓库不定期放出免费TOKEN
-
-## 概述
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`reqrio` 是一个面向 **协议研究、TLS 指纹控制、高并发采集、复杂网络环境模拟** 设计的
-HTTP 请求库，主要用于需要精确控制网络行为的场景，
-比如协议研究、指纹分析、高并发采集以及复杂反爬环境下的请求构造。
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`reqrio` 提供浏览器级 TLS 指纹控制能力，包括 JA3、JA4、自定义 ClientHello 等功能。
-同时支持同步与异步接口、多语言绑定、流式上传下载以及低内存占用设计。
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`reqrio`是由Rust编写HTTP客户端请求库,并通过ffi绑定到多个语言。支持HTTP/1.1、HTTP/2.0，
-并在启用 `quic` 特性时支持 HTTP/3 / QUIC；TLS 支持 TLS 1.2 和 TLS 1.3。
-
-## reqrio 更关注另一类问题：
-
-- TLS ClientHello 是否与浏览器一致
-- Header 顺序是否可控
-- HTTP/2 行为是否可控
-- 指纹是否能够复现
-- 高并发场景下内存是否足够低性能是否足够
-- 是否同时支持同步和异步请求
-
-## 🔐 TLS 栈与指纹系统
-
-`reqrio` 的 TLS 能力由 **reqtls** 提供支持，是整个项目的核心模块。
-
-### 🧩 `reqtls` — TLS 核心引擎
-
-`reqtls` 负责构建与控制 TLS handshake 行为：
-
-- TLS 1.2 / TLS 1.3 handshake 构造
-- ClientHello 完全可编排生成
-- cipher suites 顺序与策略控制
-- TLS extensions 管理
-- ALPN / SNI 控制
-- Session Ticket / Resumption 支持
-- JA3 / JA4 fingerprint 生成基础
-
-> ⚠️ reqtls 并不是系统 TLS wrapper，而是可编排 TLS handshake 构造器
-
----
-
-## ✅ 能力对比（HTTP 客户端库）
-
-| 能力 / 特性           | reqrio       | requests    | request-go | curl_cffi | geektls | netty    |
-|-----------------------|--------------|-------------|------------|-----------|---------|----------|
-| HTTP/1                | ✅           | ✅          | ✅         | ✅        | ✅      | ✅       |
-| HTTP/2                | ✅           | ❌          | ✅         | ✅        | ✅      | ✅       |
-| HTTP/3 / QUIC         | ⚠️(quic特性) | ❌          | ❌         | ⚠️(有限)  | ✅      | ✅       |
-| HTTPS / TLS           | ✅           | ✅          | ✅         | ✅        | ✅      | ✅       |
-| Cookie 自动管理       | ✅           | ✅          | ✅         | ✅        | ✅      | ❌       |
-| Proxy 代理支持        | ✅           | ✅          | ✅         | ✅        | ✅      | ✅       |
-| IP+域名模式           | ✅           | ⚠️(DNS)     | ⚠️(适配层) | ✅        | ✅      | ❌       |
-| 重定向控制            | ✅           | ✅          | ✅         | ✅        | ✅      | ❌       |
-| Header 自定义         | ✅           | ✅          | ✅         | ✅        | ✅      | ✅       |
-| Header 顺序控制       | ✅           | ❌          | ✅         | ✅        | ✅      | ⚠️(有限) |
-| 连接复用 (Keep-Alive) | ✅           | ✅          | ✅         | ✅        | ✅      | ✅       |
-| 流式请求 / 响应       | ✅           | ✅          | ✅         | ✅        | ✅      | ✅       |
-| 超低延迟优化          | ✅           | ❌          | ❌         | ⚠️(受限)  | ✅      | ✅       |
-| 高并发支持            | ✅           | ⚠️(有限)    | ✅         | ⚠️(有限)  | ✅      | ✅       |
-| HTTP2指纹             | ✅           | ❌          | ✅         | ⚠️(有限)  | ✅      | ❌       |
-| HTTP3指纹             | ✅           | ❌          | ❌         | ❌        | ✅      | ⚠️(有限) |
-| TLCP                  | ✅           | ❌          | ❌         | ❌        | ❌      | ⚠️(有限) |
-| TLS版本控制           | ✅           | ⚠️(min/max) | ✅         | ⚠️(有限)  | ✅      | ❌       |
-| 会话密钥导出          | ✅           | ⚠️(配置)    | ⚠️(配置)   | ✅        | ✅      | ❌       |
-| 超时控制              | ✅           | ✅          | ✅         | ✅        | ✅      | ✅       |
-| 文件上传与下载        | ✅           | ✅          | ✅         | ✅        | ✅      | ✅       |
-| 多语言支持            | ✅           | ❌          | ✅         | ✅        | ✅      | ❌       |
-| TLS会话恢复           | ⚠️(仅TLS1.2) | ⚠️(有限)    | ⚠️(有限)   | ⚠️(有限)  | ✅      | ⚠️(有限) |
-| mTls双向证书HTTP      | ✅           | ✅          | ✅         | ✅        | ✅      | ✅       |
-| UA / TLS 联动         | ✅           | ❌          | ✅         | ❌        | ✅      | ❌       |
-
-* geektls项目整体是AI生成，结论仅参考
-
----
-
-## 🔐 TLS / 指纹能力
-
-| 能力 / 特性              | reqrio     | requests    | request-go | uTLS     | curl_cffi | geektls    | netty    |
-|--------------------------|------------|-------------|------------|----------|-----------|------------|----------|
-| ClientHello 完全可控     | ✅         | ❌          | ✅         | ⚠️(有限) | ❌        | ✅         | ❌       |
-| ClientHello 原始字节导入 | ✅         | ❌          | ✅         | ⚠️(模板) | ❌        | ✅         | ❌       |
-| JA3 / JA4 构造           | ✅         | ❌          | ✅         | ⚠️(模拟) | ⚠️(有限)  | ✅         | ❌       |
-| JA3 / JA4 计算           | ❌         | ❌          | ❌         | ❌       | ⚠️(有限)  | ✅         | ❌       |
-| Cipher Suites 顺序控制   | ✅         | ❌          | ✅         | ⚠️(模板) | ⚠️(有限)  | ✅         | ❌       |
-| Extension 顺序控制       | ✅         | ❌          | ✅         | ⚠️(模板) | ⚠️(有限)  | ✅         | ❌       |
-| TLS 1.2 / 1.3 精细控制   | ✅         | ⚠️(min/max) | ✅         | ⚠️(有限) | ⚠️(有限)  | ✅         | ❌       |
-| TLS 版本控制             | ✅         | ⚠️(min/max) | ✅         | ✅       | ⚠️(有限)  | ✅         | ❌       |
-| ALPN 控制                | ✅         | ⚠️(有限)    | ✅         | ✅       | ⚠️(有限)  | ✅         | ✅       |
-| SNI+IP+域名模式          | ✅         | ⚠️(自定义)  | ✅         | ✅       | ✅        | ✅         | ✅       |
-| TLS 指纹随机化           | ✅         | ❌          | ✅         | ❌       | ❌        | ✅         | ❌       |
-| 自定义 TLS 指纹          | ✅         | ❌          | ✅         | ⚠️(模板) | ❌        | ✅         | ❌       |
-| 浏览器级 TLS 模拟        | ✅         | ❌          | ✅         | ⚠️(有限) | ✅        | ✅         | ❌       |
-| 内置浏览器指纹库         | ✅         | ❌          | ✅         | ⚠️(模板) | ✅        | ✅         | ❌       |
-| Session Ticket 编排      | ✅         | ❌          | ⚠️(有限)   | ❌       | ❌        | ✅         | ❌       |
-| HRR(HelloRetryRequest)   | ✅         | ❌          | ❌         | ❌       | ❌        | ✅         | ❌       |
-| 证书压缩(Brotli)         | ✅         | ❌          | ✅         | ❌       | ⚠️(有限)  | ✅         | ❌       |
-| mTLS 双向认证            | ✅         | ✅          | ✅         | ✅       | ✅        | ✅         | ✅       |
-| 自定义 CA / 证书校验开关 | ✅         | ✅          | ✅         | ✅       | ✅        | ✅         | ✅       |
-| TLS 会话恢复             | ⚠️(TLS1.2) | ⚠️(有限)    | ⚠️(有限)   | ⚠️(有限) | ⚠️(有限)  | ✅         | ⚠️(有限) |
-| TLS 1.3 PSK / 0-RTT      | ❌         | ❌          | ❌         | ❌       | ❌        | ⚠️(待完善) | ❌       |
-| SSLKEYLOGFILE导出        | ✅         | ⚠️(配置)    | ⚠️(配置)   | ✅       | ✅        | ✅         | ❌       |
-| ECH(未开放)              | ⚠️(未开放) | ❌          | ❌         | ❌       | ❌        | ✅         | ❌       |
-| TLCP / SM                | ✅         | ❌          | ❌         | ❌       | ❌        | ❌         | ❌       |
-
-* geektls项目整体是AI生成，结论仅参考
-
----
-
-
-> ⚠️ 部分功能是付费使用
----
-
-### 🌊 低copy
-
-`reqrio` 是一个 低拷贝（low-copy）请求发送引擎，用于高效地将 用户数据或文件数据 通过 TLS 加密后发送到 TCP。`reqrio`
-针对用户传入form-data、json、bytes、text等数据进行转bytes储存，然后仅在进入 TLS 加密阶段时发生一次 copy， 其余阶段仅对数据进行
-borrow（借用）。对文件上传则通过into_reader进行读取，减小内存开销
-
-```text
-
-        Form  ┌────────┐encode->bytes ┌──────────┐             ┌──────────┐
- User ───────►│        │─────────────►│          │             │          │
-        Json  │ ScReq  │  into_bytes  │  Request │ copy slice  │ fragment │ write ┌───────┐
-              │ AcReq  │              │  borrow  │────────────►│  TLS     │──────►│  TCP  │
-       Files  │(Engine)│ into_reader  │  reader  │             │ Encrypt  │       └───────┘
- User ───────►│        │─────────────►│          │             │          │
-              └────────┘              └──────────┘             └──────────┘
+```toml
+[dependencies]
+reqo = "0.5"
 ```
 
-## 🧱 架构设计
+## 特性
 
-reqrio 采用分层网络栈设计：
+- **同步 + 异步**：`ScReq`（阻塞）和 `AcReq`（基于 tokio，需开启 `aync` feature）API 一致。
+- **HTTP/1.1 和 HTTP/2**：通过 ALPN 协商，支持流水线请求（`send` / `recv`）和流式响应。
+- **请求头保序**：严格按书写顺序发送；各协议的默认顺序参照真实浏览器。
+- **HTTP/2 指纹**：SETTINGS / WINDOW_UPDATE 帧和流优先级都可以配置。
+- **可插拔 TLS**：默认 rustls（支持 mTLS、TLS 1.2/1.3、会话恢复、key log），也可以接入自己的 `TlsConnector`。
+- **轻量宏**：`body!` 构造 JSON / 表单请求体，`header!` 构造请求头，只依赖标准库类型。
+- **自动解码**：自动解压 gzip、deflate、brotli、zstd 响应，包括 chunked 传输。
+- **代理**：HTTP CONNECT 和 SOCKS5，支持认证。
+- **WebSocket** 客户端（同步 / 异步），支持 permessage-deflate。
+- **纯 Rust 核心**：没有 FFI，编译时不需要下载任何东西。
 
-```text
-┌────────────────────────────┐
-│ HTTP Layer                 │
-│ req / res / cookie / etc   │
-└────────────┬───────────────┘
-             │
-┌────────────▼───────────────┐
-│ Request Engine Layer       │
-│ header ordering / stream   │
-└────────────┬───────────────┘
-             │
-┌────────────▼───────────────┐
-│ TLS Layer (reqtls)         │
-│ handshake / cipher / ALPN  │
-│ ClientHello builder        │
-└────────────┬───────────────┘
-             │
-┌────────────▼───────────────┐
-│ Transport Layer            │
-│ TCP / proxy / socket       │
-└────────────────────────────┘
+## 快速开始
+
+```rust,no_run
+use reqo::*;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // 一次性请求
+    let res = reqo::get("https://httpbin.org/get", None)?;
+    println!("{} {}", res.status(), res.as_text()?);
+
+    // 可复用的会话：保持连接、cookie 和请求头
+    let mut req = ScReq::new()
+        .with_alpn(ALPN::HTTP20)                    // 优先 h2，不支持时回落到 http/1.1
+        .with_timeout(Timeout::new_same(5000, 3))   // 超时 5 秒，最多尝试 3 次
+        .with_header(header! {
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+            "accept": "*/*",
+            "accept-encoding": "gzip, deflate, br, zstd",
+        });
+
+    let res = req.post("https://httpbin.org/post", body! { "name": "reqo", "page": 2 })?;
+    println!("{}", res.as_text()?);
+    Ok(())
+}
 ```
 
-## 多语言绑定
+异步用法相同，换成 `AcReq` 并加上 `.await`（需开启 `aync` feature）：
 
-| Language | 类型 | Status | 文档                                                                                                 |
-|----------|------|--------|------------------------------------------------------------------------------------------------------|
-| Rust     | 原生 | ✅     | [docs.rs](https://docs.rs/reqrio/latest/reqrio/)                                                     |
-| Python   | FFI  | ✅     | [pypi](https://pypi.org/project/reqrio/)                                                             |
-| Java     | JNI  | ✅     | [Maven](https://javadoc.io/doc/io.github.xllgl2017/reqrio/latest/org/xllgl2017/package-summary.html) |
-| Node.js  | FFI  | ✅     | [Node.js](https://www.npmjs.com/package/reqrio)                                                      |
-| Go       | CGO  | ✅     |                                                                                                      |
-| Qt/C++   | FFI  | ✅     |                                                                                                      |
+```rust,ignore
+use reqo::*;
 
-## Roadmap
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut req = AcReq::new().with_alpn(ALPN::HTTP20);
+    let res = req.get("https://httpbin.org/get", None).await?;
+    println!("{}", res.as_text()?);
+    Ok(())
+}
+```
 
-### v0.4
+## 请求体
 
-- [x] TLS 1.3 指纹 / ClientHello 控制
-- [x] HTTP/3（需启用 `quic` 特性）
-- [x] QUIC（需启用 `quic` 特性）
+```rust
+use reqo::*;
 
----
+let name = "reqo";
 
-### v1.0
+// 默认是 JSON：支持嵌套对象、数组和 null
+let json = body! {
+    "name": name,
+    page: 2,
+    "tags": ["http", "tls"],
+    "extra": { "debug": true, "proxy": null },
+};
 
-- [ ] API 稳定
-- [ ] 文档站
-- [ ] 长期支持版本
+// 同样的字段，以 application/x-www-form-urlencoded 发送
+let form = body! { "name": name, "page": 2 }.form();
 
-## 🚀 快速开始
+// 纯文本和原始字节
+let text = Body::from("hello");
+let bytes = Body::from(vec![1u8, 2, 3]);
+
+// multipart 上传：表单字段 + 文件
+let mut file = HttpFile::new_bytes_data([("desc", "avatar")], b"...png bytes...".to_vec());
+file.add_form(FileForm::new_bytes(b"second file".to_vec()).with_field_name("file2"));
+let multipart = Body::from(file);
+```
+
+`body!` 中的值可以是任意标准库类型：数字、`bool`、`&str` / `String`、`Option`、`Vec`、
+数组、`HashMap` / `BTreeMap`。自定义类型可以实现 `ToJson`，或在开启 `serde` feature 后使用 `Body::json(&value)`。
+
+## 响应
+
+```rust,ignore
+let res = req.get("https://httpbin.org/json", None)?;
+res.status();          // HttpStatus
+res.header();          // &Header
+res.as_text()?;        // &str
+res.as_bytes();        // &[u8]
+
+// 开启 `serde` feature 后
+let doc: serde_json::Value = res.json()?;
+let typed: MyStruct = res.json()?;
+```
+
+## 查询参数、流水线、流式响应
+
+```rust,no_run
+# use reqo::*;
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+# let mut req = ScReq::new();
+// 查询参数
+let url = "https://httpbin.org/get".params([("q", "rust"), ("page", "2")])?;
+let res = req.get(url, None)?;
+
+// 流水线：先连续发送多个请求，再依次取回响应
+let a = req.send(Method::GET, "https://httpbin.org/uuid", None)?;
+let b = req.send(Method::GET, "https://httpbin.org/ip", None)?;
+let (ra, rb) = (req.recv(a)?, req.recv(b)?);
+
+// 流式响应：先拿到响应头，再逐块读取响应体
+let head = req.send_stream(Method::GET, "https://httpbin.org/stream/20", None)?;
+let sid = head.sid;
+while let Some(chunk) = req.next_chunk(sid)? {
+    println!("{} bytes", chunk.len());
+}
+# Ok(())
+# }
+```
+
+## 请求头与 HTTP/2 指纹
+
+请求头严格按插入顺序发送。`header!` 构造一个 `Header`；`merge_headers` 把请求头合并进会话，
+不会清掉已有的请求头：
+
+```rust,no_run
+# use reqo::*;
+# let mut req = ScReq::new();
+req.merge_headers(header! { "x-trace": 42, "cookie": "a=1; b=2" });
+req.insert_header("x-late", "late");
+```
+
+HTTP/2 连接前言之后发送的帧可以自定义：
+
+```rust
+use reqo::*;
+
+let h2 = H2Finger {
+    frames: vec![
+        H2Frame::new_setting(vec![
+            H2Setting::HeaderTableSize(65536),
+            H2Setting::EnablePush(0),
+            H2Setting::InitialWindowSize(6291456),
+            H2Setting::MaxHeaderListSize(262144),
+        ]),
+        H2Frame::new_window_update(15663105),
+    ],
+    weight: 255,
+    priority: true,
+};
+let req = ScReq::new().with_fingerprint(Fingerprint::new_h2(h2));
+```
+
+## TLS
+
+reqo 自己不做 TLS 握手。它把（可能经过代理的）连接交给一个 `TlsConnector`，拿回加密后的流。
+
+**默认：rustls**（`rustls` feature，默认开启）
+
+```rust,no_run
+use reqo::*;
+
+let identity = ClientIdentity::from_pem_files("client.pem", "client.key")?;
+let req = ScReq::new()
+    .with_version(TlsVersion::Tls13)            // 最高提供的 TLS 版本
+    .with_mtls(identity, None)                  // 客户端证书（mTLS）
+    .with_key_log("keys.log");                  // 导出 NSS key log 供 Wireshark 解密（仅限调试）
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+- 根证书使用 Mozilla 根证书集（`webpki-roots`）。`SSL_CERT_FILE` 指向的 PEM 文件中的证书也会被信任，
+  还可以用 `RustlsConnector::with_extra_roots_pem` 追加。
+- `with_verify(false)` 会跳过证书校验，只应在测试中使用。
+- 会话票据按配置缓存，后续连接会自动恢复会话。
+
+**接入自己的 TLS 实现**：实现 `reqo::tls::TlsConnector`，并关闭默认的 `rustls` feature，避免把 rustls 编译进来：
+
+```toml
+reqo = { version = "0.5", default-features = false, features = ["zstd"] }
+```
+
+```rust,ignore
+use reqo::tls::{SyncIo, TlsConnector, TlsIo, TlsOptions};
+use reqo::HlsResult;
+
+struct MyConnector;
+
+impl TlsConnector for MyConnector {
+    fn connect(&self, io: Box<dyn SyncIo>, opts: &TlsOptions<'_>) -> HlsResult<Box<dyn TlsIo>> {
+        // 在 `io` 上针对 `opts.server_name` 完成握手，提供 `opts.alpn` 中的协议，
+        // 然后返回一个能报告协商结果（ALPN）的流。
+        todo!()
+    }
+    // 开启 `aync` feature 时，还需要实现 `connect_async`。
+}
+
+let req = ScReq::new().with_tls_connector(std::sync::Arc::new(MyConnector));
+```
+
+`TlsOptions` 会传入服务器名、ALPN 列表、是否校验证书、最高版本、客户端证书、CA 证书和 key log 路径。
+后端可以忽略自己不支持的选项，也可以在自己的 connector 类型上提供额外配置（比如 ClientHello 指纹）。
+
+## 代理与 WebSocket
+
+```rust,no_run
+# use reqo::*;
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+let req = ScReq::new().with_proxy(Proxy::try_from("socks5://user:pass@127.0.0.1:1080")?);
+let req = ScReq::new().with_proxy(Proxy::try_from("http://127.0.0.1:8080")?);
+
+let mut ws = WebSocket::open_sync("wss://echo.websocket.org")?;
+ws.send_text("hello").wait()?;
+let frame = ws.read_frame().wait()?;
+# Ok(())
+# }
+```
+
+## Feature 列表
+
+| Feature  | 默认 | 说明                                                   |
+|----------|:----:|--------------------------------------------------------|
+| `rustls` |  是  | 默认 TLS 后端（rustls + ring + webpki-roots）          |
+| `zstd`   |  是  | zstd 解码（libzstd 由 `cc` 从源码编译）                |
+| `aync`   |      | 基于 tokio 的异步 API（`AcReq`、异步 WebSocket）       |
+| `serde`  |      | `Response::json::<T>()`、`Body::json(&T)`、serde 派生  |
+| `log`    |      | 通过 `log` crate 输出内部日志                          |
+
+可插拔 TLS 层暂时还不支持 HTTP/3（QUIC）。
+
+## Crate
+
+| Crate       | 说明                                                         |
+|-------------|--------------------------------------------------------------|
+| `reqo`      | HTTP 客户端本体                                              |
+| `reqo-base` | 缓冲区、URL 类型、ALPN 和内容编解码，供 TLS 后端 crate 共用  |
+
+## 致谢
+
+reqo fork 自 [reqrio](https://github.com/xllgl2017/reqrio) 0.4.2。
 
 ## 许可证
 
-该项目是Apache 2.0许可证下的开源项目。
-
-## 贡献
-
-欢迎提交问题和拉取请求。
-
-## 联系方式
-
-* Tg 群：https://t.me/+VVfbAeug-ohhZjU1
-* QQ 群：1083315546
+Apache-2.0，见 [LICENSE-APACHE](LICENSE-APACHE)。
